@@ -30,7 +30,7 @@
     "@nextcloud/router": "^3.0.0",
     "@nextcloud/vue": "^8.11.2",
     "serve": "^14.2.3",
-    "vue": "^2.7.16"
+    "vue": "^3.0.0"
   },
   "browserslist": [
     "extends @nextcloud/browserslist-config"
@@ -44,8 +44,8 @@
     "@nextcloud/browserslist-config": "^2.2.0",
     "@nextcloud/eslint-config": "^v8.3.0-beta.2",
     "@nextcloud/stylelint-config": "^2.4.0",
-    "@nextcloud/vite-config": "^1.2.5",
+    "@nextcloud/vite-config": "^2.5.0",
     "@nextcloud/webpack-vue-config": "^6.0.1",
-    "vite": "^5.4.2"
+    "vite": "^7.1.4"
   }
 }
