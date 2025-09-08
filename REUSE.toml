@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2025 LibreCode coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+version = 1
+SPDX-PackageName = "extract"
+SPDX-PackageSupplier = "LibreCode <contact@librecode.coop>"
+SPDX-PackageDownloadLocation = "https://github.com/LibreCodeCoop/extract"
+
+default-license = "AGPL-3.0-or-later"
+default-copyright = "2025 LibreCode coop and contributors"
+
+[[annotations]]
+path = ".github/CODEOWNERS"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "none"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = [
+    "appinfo/info.xml",
+    "composer.json",
+    "composer.lock",
+    ".tx/config",
+    "img/*.png",
+    "img/*.svg",
+    "l10n/*.js",
+    "l10n/*.json",
+    "Makefile",
+    "openapi.json",
+    "package-lock.json",
+    "package.json",
+    "psalm.xml",
+    "src/types/openapi/openapi.ts",
+    "tests/psalm-baseline.xml",
+    "vendor-bin/**/composer.json",
+    "vendor-bin/**/composer.lock",
+	".github/pull_request_template.md"
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025 LibreCode coop and contributors"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
