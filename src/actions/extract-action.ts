@@ -1,3 +1,8 @@
+/**
+ * SPDX-FileCopyrightText: 2025 LibreCode coop and contributors
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 import type { Node, View } from '@nextcloud/files'
 
 import ArchiveArrowUpSvg from '@mdi/svg/svg/archive-arrow-up.svg?raw'
@@ -40,12 +45,15 @@ export const extractAction = new FileAction({
 		const data = {
 			nameOfFile: node.attributes?.basename ?? '',
 			directory: dir,
-			external: node.attributes?.['mount-type']?.startsWith('external') ? 1 : 0,
+			external: node.attributes?.['mount-type']?.startsWith('external')
+				? 1
+				: 0,
 			mime: node.attributes?.mime,
 		}
 
 		const url = generateOcsUrl('/apps/extract/api/v1/extraction/execute')
-		axios.post(url, data)
+		axios
+			.post(url, data)
 			.then(({ data }) => {
 				const time = data.ocs.data.extracted.mtime * 1000
 				const folder = new Folder({
@@ -58,7 +66,8 @@ export const extractAction = new FileAction({
 					attributes: {
 						'mount-type': data.ocs.data.extracted['mount-type'],
 						'owner-id': data.ocs.data.extracted.owner,
-						'owner-display-name': data.ocs.data.extracted['owner-display-name'],
+						'owner-display-name':
+							data.ocs.data.extracted['owner-display-name'],
 					},
 				})
 
