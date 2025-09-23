@@ -19,19 +19,16 @@ final class Application extends App implements IBootstrap {
 
 	public const APP_ID = 'extract';
 
-	public function __construct(array $urlParams = []) {
-		parent::__construct(self::APP_ID, $urlParams);
+	public function __construct() {
+		parent::__construct(self::APP_ID);
 	}
 
-	// Called later than "register".
-	#[\Override]
-	public function boot(IBootContext $context): void {
-	}
-
-	// Called earlier than boot, so anything initialized in the
-	// "boot()" method must not be used here.
 	#[\Override]
 	public function register(IRegistrationContext $context): void {
 		$context->registerEventListener(LoadAdditionalScriptsEvent::class, LoadExtractActions::class);
+	}
+
+	#[\Override]
+	public function boot(IBootContext $context): void {
 	}
 }

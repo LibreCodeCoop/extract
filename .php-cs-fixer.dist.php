@@ -21,5 +21,7 @@ $config
 	->notPath('src')
 	->notPath('vendor')
 	->notPath('vendor-bin')
+	->notPath('build')
+	->notPath('node_modules')
 	->in(__DIR__);
 return $config;
