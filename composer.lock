@@ -4,9 +4,8 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7365f43b6c225a61f49e55a7f4cc6d43",
-    "packages": [],
-    "packages-dev": [
+    "content-hash": "8b97ca295ed78f1cd04575a07a8d5a87",
+    "packages": [
         {
             "name": "bamarni/composer-bin-plugin",
             "version": "1.8.2",
@@ -63,19 +62,21 @@
                 "source": "https://github.com/bamarni/composer-bin-plugin/tree/1.8.2"
             },
             "time": "2022-10-31T08:38:03+00:00"
-        },
+        }
+    ],
+    "packages-dev": [
         {
             "name": "nextcloud/ocp",
             "version": "dev-master",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nextcloud-deps/ocp.git",
-                "reference": "dcc83e350a5bbf3f4d679a772e2b46c5f0844d75"
+                "reference": "f1f6aa62139bbd44e6e9fbbf9e0715831430f9d1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nextcloud-deps/ocp/zipball/dcc83e350a5bbf3f4d679a772e2b46c5f0844d75",
-                "reference": "dcc83e350a5bbf3f4d679a772e2b46c5f0844d75",
+                "url": "https://api.github.com/repos/nextcloud-deps/ocp/zipball/f1f6aa62139bbd44e6e9fbbf9e0715831430f9d1",
+                "reference": "f1f6aa62139bbd44e6e9fbbf9e0715831430f9d1",
                 "shasum": ""
             },
             "require": {
@@ -111,7 +112,7 @@
                 "issues": "https://github.com/nextcloud-deps/ocp/issues",
                 "source": "https://github.com/nextcloud-deps/ocp/tree/master"
             },
-            "time": "2025-09-04T08:38:27+00:00"
+            "time": "2025-09-23T00:46:33+00:00"
         },
         {
             "name": "psr/clock",
@@ -322,7 +323,9 @@
     },
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": {},
+    "platform": {
+        "php": "^8.1"
+    },
     "platform-dev": {},
     "platform-overrides": {
         "php": "8.1"

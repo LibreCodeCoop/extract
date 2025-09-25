@@ -1,27 +1,19 @@
 {
-	"name": "extract/extract",
+	"name": "librecode/extract",
 	"description": "Allows to extract archive from the web interface",
-	"type": "project",
-	"license": "AGPL",
+	"license": "AGPL-3.0-or-later",
 	"authors": [
 		{
 			"name": "Paul Lereverend"
+		},
+		{
+			"name": "LibreCode Coop"
 		}
 	],
-	"config": {
-		"optimize-autoloader": true,
-		"classmap-authoritative": true,
-		"sort-packages": true,
-		"platform": {
-			"php": "8.1"
-		},
-		"allow-plugins": {
-			"bamarni/composer-bin-plugin": true
+	"autoload": {
+		"psr-4": {
+			"OCA\\Extract\\": "lib/"
 		}
-	},
-	"require-dev": {
-		"bamarni/composer-bin-plugin": "^1.8",
-		"nextcloud/ocp": "dev-master"
 	},
 	"scripts": {
 		"bin": "echo 'bin not installed'",
@@ -39,6 +31,24 @@
 			"composer dump-autoload"
 		]
 	},
+	"require": {
+		"bamarni/composer-bin-plugin": "^1.8",
+		"php": "^8.1"
+	},
+	"require-dev": {
+		"nextcloud/ocp": "dev-master"
+	},
+	"config": {
+		"optimize-autoloader": true,
+		"classmap-authoritative": true,
+		"sort-packages": true,
+		"platform": {
+			"php": "8.1"
+		},
+		"allow-plugins": {
+			"bamarni/composer-bin-plugin": true
+		}
+	},
 	"extra": {
 		"bamarni-bin": {
 			"bin-links": true,
@@ -48,11 +58,6 @@
 	"autoload-dev": {
 		"psr-4": {
 			"OCP\\": "vendor/nextcloud/ocp/OCP/"
-		}
-	},
-	"autoload": {
-		"psr-4": {
-			"OCA\\Extract\\": "lib/"
 		}
 	}
 }

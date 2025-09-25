@@ -10,22 +10,22 @@ This app does only support local external storage backend
 
 ## Supported
 
-* Zip 
-* Rar
-* Tar
-* Gzip
-* 7z
-* Deb
-* Bzip2
+- Zip 
+- Rar
+- Tar
+- Gzip
+- 7z
+- Deb
+- Bzip2
 
 ## Requirements
 
-* Rar PHP extension 
+- Rar PHP extension 
 ```bash
 pecl -v install rar ## or ## sudo apt-get install unrar
 ```
 
-* p7zip and p7zip-full 
+- p7zip and p7zip-full 
 
 ## Steps to install p7zip on Linux &raquo; Ubuntu and Fedora or CentOS / RHEL
 
@@ -78,9 +78,9 @@ sudo rpm -U --quiet p7zip-plugins-16.02-10.el6.x86_64.rpm
 
 ## TODO
 
-* Add password support
-* Add viewer for archives
-* Support nextcloud's encryption module
+- Add password support
+- Add viewer for archives
+- Support nextcloud's encryption module
 
 ## Preview
 
