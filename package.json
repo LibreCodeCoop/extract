@@ -15,8 +15,8 @@
     "dev": "vite build --mode development",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
-    "stylelint": "stylelint css/*.css css/*.scss src/**/*.scss",
-    "stylelint:fix": "stylelint css/*.css css/*.scss src/**/*.scss --fix",
+    "stylelint": "stylelint src/**/*.scss src/**/*.css --allow-empty-input",
+    "stylelint:fix": "src/**/*.scss src/**/*.css --fix",
     "typescript:check": "tsc --noEmit",
     "typescript:generate": "npx openapi-typescript ./openapi.json -t -o src/types/openapi/openapi.ts",
     "watch": "vite build --mode development --watch"
