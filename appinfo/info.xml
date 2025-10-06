@@ -28,7 +28,7 @@
 *  **Note :** Encrypted files are not supported yet
 ]]></description>
 
-    <version>4.0.0</version>
+    <version>3.0.0</version>
     <licence>agpl</licence>
     <author mail="paulereverend@gmail.com">Paul Lereverend</author>
     <namespace>Extract</namespace>
