@@ -6,9 +6,10 @@ OC.L10N.register(
     "Zip extension is not available" : "Zip كېڭەيتىلمەيدۇ",
     "Cannot open Zip file" : "Zip ھۆججىتىنى ئاچقىلى بولمايدۇ",
     "Oops something went wrong. Check that you have rar extension or unrar installed" : "ئاپلا خاتالىق بولدى. Rar كېڭەيتىلمە ياكى ئورناتمىغانلىقىنى تەكشۈرۈڭ",
-    "Extract" : "Extract",
+    "Oops something went wrong." : "ئاپلا ، چاتاق چىقتى.",
+    "Extract" : "يەش",
     "Extract archive from the web interface" : "تور كۆرۈنمە يۈزىدىن ئارخىپ چىقىرىڭ",
-    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "ئارخىپلارنى چىقىرىڭ.\n\n* ** قوللىدى: **\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n* ** تەلەپلەر: **\n    * Rar PHP كېڭەيتىلمىسى (pecl -v قاچىلاش rar)\n\n    * ** OR **\n    * unrar (sudo apt-get install unrar)\n\n    * ** AND **\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n* ** ئەسكەرتىش: ** شىفىرلانغان ھۆججەتلەر تېخى قوللىمايدۇ",
+    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "ئارخىپلارنى چىقىرىۋېلىش.\n\n* **قوللايدۇ :**\n\n* Zip\n* Rar\n* Tar\n* Gzip\n* 7z\n* Deb\n* Bzip2\n\n* **تەلەپلەر :**\n* Rar PHP كېڭەيتىلمىسى (pecl -v install rar)\n\n* **ياكى**\n* unrar (sudo apt-get install unrar)\n\n* **ۋە**\n* p7zip (sudo apt-get install p7zip p7zip-full)\n\n* **ئەسكەرتىش :** شىفىرلانغان ھۆججەتلەر ھازىرچە قوللىمايدۇ",
     "Extract here" : "بۇ يەردىن چىقىرىڭ"
 },
 "nplurals=2; plural=(n != 1);");
