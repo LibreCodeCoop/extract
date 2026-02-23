@@ -1,6 +1,15 @@
 OC.L10N.register(
     "extract",
     {
-    "File not found" : "Файл олдсонгүй"
+    "Encryption is not supported yet" : "Шифрлэлт одоогоор дэмжигдээгүй байна",
+    "File not found" : "Файл олдсонгүй",
+    "Zip extension is not available" : "Zip өргөтгөл боломжгүй байна",
+    "Cannot open Zip file" : "Zip файлыг нээх боломжгүй",
+    "Oops something went wrong. Check that you have rar extension or unrar installed" : "Ой, ямар нэг зүйл буруу болсон. rar өргөтгөл эсвэл unrar суулгасан эсэхийг шалгана уу",
+    "Oops something went wrong." : "Уучлаарай, алдаа гарлаа.",
+    "Extract" : "Задлах",
+    "Extract archive from the web interface" : "Вэб интерфэйсээс архивыг задлах",
+    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "Архив задлах.\n\n*  **Дэмжигдсэн форматууд:**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Шаардлагууд:**\n    * Rar PHP өргөтгөл  (pecl -v install rar)\n\n    * **Эсвэл**\n    * unrar (sudo apt-get install unrar)\n\n    * **Мөн**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Тэмдэглэл:** Шифрлэгдсэн файлуудыг одоогоор дэмждэггүй",
+    "Extract here" : "Энд задлах"
 },
 "nplurals=2; plural=(n != 1);");
