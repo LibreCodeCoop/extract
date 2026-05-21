@@ -147,9 +147,12 @@ final class ExtractionService {
 			if ($err = $this->assertSafeRarShell($file)) {
 				return $err;
 			}
-			exec('unrar x ' . escapeshellarg($file) . ' -R ' . escapeshellarg($extractTo) . '/ -o+', $output, $return);
-			if (sizeof($output) <= 4) {
-				$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Oops something went wrong. Check that you have rar extension or unrar installed')]);
+			$output = [];
+			$return = 0;
+			exec('unrar x ' . escapeshellarg($file) . ' -R ' . escapeshellarg($extractTo) . '/ -o+ 2>&1', $output, $return);
+			if ($return !== 0) {
+				$this->logger->error('unrar extract failed (rc=' . $return . '): ' . implode("\n", $output));
+				$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Failed to extract RAR archive (is the rar extension or unrar installed?)')]);
 				return $response;
 			}
 		} else {
@@ -185,11 +188,13 @@ final class ExtractionService {
 			return $err;
 		}
 
-		exec('7za -y x ' . escapeshellarg($file) . ' -o' . escapeshellarg($extractTo), $output, $return);
+		$output = [];
+		$return = 0;
+		exec('7za -y x ' . escapeshellarg($file) . ' -o' . escapeshellarg($extractTo) . ' 2>&1', $output, $return);
 
-		if (sizeof($output) <= 5) {
-			$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);
-			$this->logger->error('Is 7-Zip installed? Output: ' . print_r($output, true));
+		if ($return !== 0) {
+			$this->logger->error('7za extract failed (rc=' . $return . '): ' . implode("\n", $output));
+			$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Failed to extract archive (is 7-Zip installed?)')]);
 			return $response;
 		}
 		$response = array_merge($response, ['code' => 1]);
