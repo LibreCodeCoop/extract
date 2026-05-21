@@ -3,9 +3,13 @@ OC.L10N.register(
     {
     "Encryption is not supported yet" : "Kol kas šifravimas nepalaikomas",
     "File not found" : "Failas nerastas",
+    "Zip extension is not available" : "Zip plėtinys nepasiekiamas",
     "Cannot open Zip file" : "Nepavyksta atverti Zip failo",
+    "Oops something went wrong. Check that you have rar extension or unrar installed" : "Oi, kažkas nepavyko. Patikrinkite, ar turite įdiegtą „rar“ plėtinį arba programą „unrar“.",
+    "Oops something went wrong." : "Oi, kažkas nepavyko.",
     "Extract" : "Išskleisti",
     "Extract archive from the web interface" : "Išskleisti archyvą iš saityno sąsajos",
+    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "Išskleiskite archyvus.\n\n* **Palaikomi formatai:**\n\n* Zip\n* Rar\n* Tar\n* Gzip\n* 7z\n* Deb\n* Bzip2\n\n* **Reikalavimai:**\n* PHP plėtinys „rar“ (pecl -v install rar)\n\n* **ARBA**\n* unrar (sudo apt-get install unrar)\n\n* **IR**\n* p7zip (sudo apt-get install p7zip p7zip-full)\n\n* **Pastaba:** Šifruoti failai dar nepalaikomi",
     "Extract here" : "Išskleisti čia"
 },
 "nplurals=4; plural=(n % 10 == 1 && (n % 100 > 19 || n % 100 < 11) ? 0 : (n % 10 >= 2 && n % 10 <=9) && (n % 100 > 19 || n % 100 < 11) ? 1 : n % 1 != 0 ? 2: 3);");
