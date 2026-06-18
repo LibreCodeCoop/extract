@@ -1,13 +1,13 @@
 { "translations": {
-    "Encryption is not supported yet" : "رمزگذاری هنوز پشتیبانی نمی شود",
-    "File not found" : "فایل یافت نشد",
-    "Zip extension is not available" : "پسوند زیپ در دسترس نیست",
-    "Cannot open Zip file" : "فایل زیپ باز نمیشه",
-    "Oops something went wrong. Check that you have rar extension or unrar installed" : "اوه مشکلی پیش آمد. بررسی کنید که پسوند rar یا unrar را نصب کرده اید",
-    "Oops something went wrong." : "اوه، مشکلی پیش آمد.",
+    "Encryption is not supported yet" : "رمزگذاری هنوز پشتیبانی نمی‌شود",
+    "File not found" : "فایل پیدا نشد",
+    "Zip extension is not available" : "افزونه Zip در دسترس نیست",
+    "Cannot open Zip file" : "نمی‌توان فایل Zip را باز کرد",
+    "Oops something went wrong. Check that you have rar extension or unrar installed" : "اوه، مشکلی پیش آمد. مطمئن شوید که افزونه rar یا unrar نصب شده است",
+    "Oops something went wrong." : "اوه، مشکلی پیش آمد",
     "Extract" : "استخراج",
-    "Extract archive from the web interface" : "استخراج آرشیو از رابط وب",
-    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "استخراج آرشیوها.\n\n*  **پشتیبانی‌شده :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **پیش‌نیازها :**\n    * پسوند PHP برای Rar  (pecl -v install rar)\n\n    * **یا**\n    * unrar (sudo apt-get install unrar)\n\n    * **و**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **نکته :** فایل‌های رمزگذاری‌شده هنوز پشتیبانی نمی‌شوند",
-    "Extract here" : "اینجا استخراج کنید"
+    "Extract archive from the web interface" : "استخراج بایگانی از رابط وب",
+    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "استخراج بایگانی‌ها",
+    "Extract here" : "استخراج در اینجا"
 },"pluralForm" :"nplurals=2; plural=(n > 1);"
 }
