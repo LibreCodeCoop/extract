@@ -3,6 +3,7 @@ OC.L10N.register(
     {
     "File not found" : "Ficheiro não encontrado",
     "Zip extension is not available" : "Não está disponível a extração de ficheiros  com a extensão ZIP",
+    "Cannot open Zip file" : "Não é possível abrir o arquivo Zip",
     "Extract" : "Extrair",
     "Extract archive from the web interface" : "Extrair o ficheiro desde a interface WEB",
     "Extract here" : "Extrair aqui"
