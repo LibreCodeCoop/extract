@@ -2,6 +2,7 @@
     "File not found" : "Ficheiro não encontrado",
     "Zip extension is not available" : "Não está disponível a extração de ficheiros  com a extensão ZIP",
     "Cannot open Zip file" : "Não é possível abrir o arquivo Zip",
+    "Oops something went wrong. Check that you have rar extension or unrar installed" : "Oops, algo deu errado. Verifique se você tem instalado a extensão rar ou o unrar",
     "Oops something went wrong." : "Opa, algo deu errado.",
     "Extract" : "Extrair",
     "Extract archive from the web interface" : "Extrair o ficheiro desde a interface WEB",
