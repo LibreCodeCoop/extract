@@ -1,15 +1,15 @@
 OC.L10N.register(
     "extract",
     {
-    "Encryption is not supported yet" : "Kryptering stödjs inte ännu",
+    "Encryption is not supported yet" : "Kryptering stöds inte ännu",
     "File not found" : "Filen kunde inte hittas",
-    "Zip extension is not available" : "Zip-tillägg är inte tillgängligt",
-    "Cannot open Zip file" : "Kan inte öppna zip-fil",
+    "Zip extension is not available" : "ZIP-tillägget är inte tillgängligt",
+    "Cannot open Zip file" : "Det går inte att öppna ZIP-filen",
     "Oops something went wrong. Check that you have rar extension or unrar installed" : "Ojdå, något gick fel. Kontrollera att du har stöd för RAR eller att unrar är installerat.",
     "Oops something went wrong." : "Något gick fel.",
     "Extract" : "Extrahera",
-    "Extract archive from the web interface" : "Extrahera arkiv i webinterfacet",
-    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "Extrahera arkiv.\n\n*  **Stöds :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Krav :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **ELLER**\n    * unrar (sudo apt-get install unrar)\n\n    * **OCH**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Notera :** Krypterade filer stöds inte ännu",
+    "Extract archive from the web interface" : "Extrahera arkiv från webbgränssnittet",
+    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "Extrahera arkiv.\n\n* **Format som stöds:**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n* **Krav:**\n    * RAR-tillägget för PHP (`pecl -v install rar`)\n\n    * **ELLER**\n    * unrar (`sudo apt-get install unrar`)\n\n    * **OCH**\n    * p7zip (`sudo apt-get install p7zip p7zip-full`)\n\n* **Observera:** Krypterade filer stöds inte ännu",
     "Extract here" : "Extrahera här"
 },
 "nplurals=2; plural=(n != 1);");
