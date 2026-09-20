@@ -13,4 +13,4 @@ permissions:
 
 jobs:
   stylelint:
-    uses: LibreCodeCoop/github-workflows/.github/workflows/lint-stylelint.yml@28874b9141c73178d13aae163503d673d52df5a8
+    uses: LibreCodeCoop/github-workflows/.github/workflows/lint-stylelint.yml@bf6d298f17eacdada7d2f771cad8fe29a11ec09e
