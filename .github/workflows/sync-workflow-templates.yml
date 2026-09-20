@@ -1,0 +1,94 @@
+# This workflow is provided via the organization template repository
+#
+# https://github.com/LibreCodeCoop/.github
+# https://docs.github.com/en/actions/learn-github-actions/sharing-workflows-with-your-organization
+#
+# SPDX-FileCopyrightText: 2025 Nextcloud GmbH and Nextcloud contributors
+# SPDX-License-Identifier: MIT
+
+# This workflow will update all workflow templates
+# Additionally it will reapply `workflow.yml.patch` files after syncing and only then commit the result
+name: Update workflows
+on:
+  workflow_dispatch:
+  schedule:
+      - cron: "5 2 * * 0"
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        branches:
+          - ${{ github.event.repository.default_branch }}
+
+    name: Update workflows in ${{ matrix.branches }}
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Check actor permission
+        uses: skjnldsv/check-actor-permission@69e92a3c4711150929bca9fcf34448c5bf5526e7 # v3.0
+        with:
+          require: admin
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        with:
+          app-id: ${{ vars.LIBRECODE_WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.LIBRECODE_WORKFLOW_APP_PRIVATE_KEY }}
+          owner: LibreCodeCoop
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Checkout workflow repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: source
+          repository: LibreCodeCoop/.github
+
+      - name: Checkout app
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: target
+          ref: ${{ matrix.branches }}
+
+      - name: Synchronize workflow templates
+        id: sync
+        uses: LibreCodeCoop/github-workflows/actions/sync-workflows@57e644fe4882e942ac19bbe99729b4b7e3c9014e
+        with:
+          source: source/workflow-templates
+          target: target
+
+      - name: Create Pull Request
+        if: ${{ steps.sync.outputs.changed == 'true' }}
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          commit-message: 'ci(actions): Update workflow templates from organization template repository'
+          committer: GitHub <noreply@github.com>
+          author: librecode-workflow-automation[bot] <331658022+librecode-workflow-automation[bot]@users.noreply.github.com>
+          path: target
+          signoff: true
+          branch: 'automated/noid/${{ matrix.branches }}-update-workflows'
+          title: '[${{ matrix.branches }}] ci(actions): Update workflow templates from organization template repository'
+          draft: ${{ steps.sync.outputs.patch_failed == 'true' }}
+          add-paths: .github/workflows/*.yml,.github/actions-lock.txt
+          body: |
+            Automated update of all workflow templates from [LibreCodeCoop/.github](https://github.com/LibreCodeCoop/.github)
+            ${{ steps.sync.outputs.summary }}
+          labels: |
+            dependencies
+            3. to review
