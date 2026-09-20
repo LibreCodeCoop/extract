@@ -1,6 +1,7 @@
-# This workflow is provided via the organization template repository
+# This workflow is maintained by LibreCodeCoop/github-workflows and published
+# through the LibreCodeCoop organization workflow catalog.
 #
-# https://github.com/nextcloud/.github
+# https://github.com/LibreCodeCoop/github-workflows
 # https://docs.github.com/en/actions/learn-github-actions/sharing-workflows-with-your-organization
 
 # SPDX-FileCopyrightText: 2022 Free Software Foundation Europe e.V. <https://fsfe.org>
@@ -19,9 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: REUSE Compliance Check
-        uses: fsfe/reuse-action@bb774aa972c2a89ff34781233d275075cbddf542 # v5.0.0
+        uses: fsfe/reuse-action@676e2d560c9a403aa252096d99fcab3e1132b0f5 # v6.0.0
