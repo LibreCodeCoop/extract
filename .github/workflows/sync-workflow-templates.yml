@@ -26,8 +26,6 @@ jobs:
       matrix:
         branches:
           - ${{ github.event.repository.default_branch }}
-          - 'stable32'
-          - 'stable31'
 
     name: Update workflows in ${{ matrix.branches }}
 
@@ -67,71 +65,15 @@ jobs:
           path: target
           ref: ${{ matrix.branches }}
 
-      - name: Copy all workflow templates
-        run: |
-          echo 'SUMMARY<<EOF' >> $GITHUB_ENV
-          draft_only=0
-          for workflow in ./source/workflow-templates/*.yml; do
-            echo "❓ Looking for $workflow"
-            if [ -f "$workflow" ]; then
-              filename=$(basename "$workflow")
-              target_file="./target/.github/workflows/$filename"
-
-              # Only copy if the file exists in the target repository
-              if [ -f "$target_file" ]; then
-                if [ -f "./target/.github/actions-lock.txt" ]; then
-                  locked_version=$(grep " $filename" ./target/.github/actions-lock.txt | cat)
-                else
-                  echo "# SPDX-FileCopyrightText: 2025 Nextcloud GmbH and Nextcloud contributors" >> ./target/.github/actions-lock.txt
-                  echo "# SPDX-License""-Identifier: MIT" >> ./target/.github/actions-lock.txt
-                  locked_version=""
-                fi
-                locked_version=$(echo $locked_version | cut -f 1 -d " ")
-                new_version=$(md5sum $workflow | cut -f 1 -d " ")
-
-                # Only update if the action changes
-                if [[ "$locked_version" != "$new_version" ]]; then
-                  echo "ℹ️ Locked version: $locked_version"
-                  echo "ℹ️ Current version: $new_version"
-                  echo "🆙 Updating existing workflow: $filename"
-                  echo "- 🆙 Updated [$filename](https://github.com/LibreCodeCoop/.github/commits/main/workflow-templates/$filename)" >> $GITHUB_ENV
-
-                  cp "$workflow" "$target_file"
-
-                  # Apply patch if one exists
-                  if [ -f "$target_file.patch" ]; then
-                    echo "🩹 Applying patch"
-                    cd ./target
-                    set +e
-                    patch -p1 < ".github/workflows/$filename.patch"
-                    patch_worked=$?
-                    set -e
-                    cd -
-                    if [[ "$patch_worked" == "0" ]]; then
-                      echo "  - Patch applied" >> $GITHUB_ENV
-                    else
-                      echo "  - [ ] ❌ Patch failed" >> $GITHUB_ENV
-                      draft_only=1
-                    fi
-                  fi
-
-                  if [[ "$locked_version" != "" ]]; then
-                    sed -i "s/$locked_version $filename/$new_version $filename/" ./target/.github/actions-lock.txt
-                  else
-                    echo "$new_version $filename" >> ./target/.github/actions-lock.txt
-                  fi
-                else
-                  echo "✅ Skipping $filename: already up to date"
-                fi
-              else
-                echo "⏭️ Skipping $filename: does not exist in target repository"
-              fi
-            fi
-          done
-          echo 'EOF' >> $GITHUB_ENV
-          echo "DRAFT_ONLY=${draft_only}" >> $GITHUB_ENV
+      - name: Synchronize workflow templates
+        id: sync
+        uses: LibreCodeCoop/github-workflows/actions/sync-workflows@57e644fe4882e942ac19bbe99729b4b7e3c9014e
+        with:
+          source: source/workflow-templates
+          target: target
 
       - name: Create Pull Request
+        if: ${{ steps.sync.outputs.changed == 'true' }}
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -142,11 +84,11 @@ jobs:
           signoff: true
           branch: 'automated/noid/${{ matrix.branches }}-update-workflows'
           title: '[${{ matrix.branches }}] ci(actions): Update workflow templates from organization template repository'
-          draft: ${{ env.DRAFT_ONLY == 1 }}
+          draft: ${{ steps.sync.outputs.patch_failed == 'true' }}
           add-paths: .github/workflows/*.yml,.github/actions-lock.txt
           body: |
             Automated update of all workflow templates from [LibreCodeCoop/.github](https://github.com/LibreCodeCoop/.github)
-            ${{ env.SUMMARY }}
+            ${{ steps.sync.outputs.summary }}
           labels: |
             dependencies
             3. to review
