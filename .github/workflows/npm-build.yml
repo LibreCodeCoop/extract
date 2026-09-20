@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 LibreCode coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# This workflow is published through the LibreCode organization catalog.
+# Implementation: LibreCodeCoop/github-workflows
+
+name: Build Javascript
+
+on: pull_request
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  npm-build:
+    uses: LibreCodeCoop/github-workflows/.github/workflows/npm-build.yml@d96f4b5dcf780dea20d8843f54c4b52207dc25fd
