@@ -1,12 +1,10 @@
---- .github/workflows/sync-workflow-templates.yml
-+++ .github/workflows/sync-workflow-templates.yml
-@@ -28,9 +28,8 @@
+diff --git a/.github/workflows/sync-workflow-templates.yml b/.github/workflows/sync-workflow-templates.yml
+--- a/.github/workflows/sync-workflow-templates.yml
++++ b/.github/workflows/sync-workflow-templates.yml
+@@ -26,6 +26,8 @@ jobs:
        matrix:
          branches:
            - ${{ github.event.repository.default_branch }}
--          - 'stable35'
--          - 'stable34'
--          - 'stable33'
 +          - 'stable32'
 +          - 'stable31'
  
