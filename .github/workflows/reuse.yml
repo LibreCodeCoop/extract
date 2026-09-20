@@ -1,29 +1,16 @@
-# This workflow is maintained by LibreCodeCoop/github-workflows and published
-# through the LibreCodeCoop organization workflow catalog.
-# Managed by LibreCode workflow synchronization; local edits are treated as divergence.
-#
-# https://github.com/LibreCodeCoop/github-workflows
-# https://docs.github.com/en/actions/learn-github-actions/sharing-workflows-with-your-organization
+# SPDX-FileCopyrightText: 2026 LibreCode coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
-# SPDX-FileCopyrightText: 2022 Free Software Foundation Europe e.V. <https://fsfe.org>
-#
-# SPDX-License-Identifier: CC0-1.0
+# This workflow is published through the LibreCode organization catalog.
+# Implementation: LibreCodeCoop/github-workflows
 
 name: REUSE Compliance Check
 
-on: [pull_request]
+on: pull_request
 
 permissions:
   contents: read
 
 jobs:
-  reuse-compliance-check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: REUSE Compliance Check
-        uses: fsfe/reuse-action@676e2d560c9a403aa252096d99fcab3e1132b0f5 # v6.0.0
+  reuse:
+    uses: LibreCodeCoop/github-workflows/.github/workflows/reuse.yml@5c8e231dae8e4fa1764fe84b552c48f45b6d39e8
