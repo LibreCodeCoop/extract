@@ -1,16 +1,7 @@
 diff --git a/.github/workflows/sync-workflow-templates.yml b/.github/workflows/sync-workflow-templates.yml
 --- a/.github/workflows/sync-workflow-templates.yml
 +++ b/.github/workflows/sync-workflow-templates.yml
-@@ -29,6 +29,8 @@
-       matrix:
-         branches:
-           - ${{ github.event.repository.default_branch }}
-+          - 'stable32'
-+          - 'stable31'
- 
-     name: Update workflows in ${{ matrix.branches }}
- 
-@@ -170,6 +172,7 @@
+@@ -170,6 +170,7 @@
            source: source/workflow-templates
            target: target
            catalog-commit: ${{ steps.catalog-revision.outputs.sha }}
