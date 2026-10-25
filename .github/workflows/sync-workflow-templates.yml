@@ -29,6 +29,8 @@ jobs:
       matrix:
         branches:
           - ${{ github.event.repository.default_branch }}
+          - 'stable32'
+          - 'stable31'
 
     name: Update workflows in ${{ matrix.branches }}
 
@@ -38,17 +40,25 @@ jobs:
 
     steps:
       - name: Check actor permission
-        uses: skjnldsv/check-actor-permission@69e92a3c4711150929bca9fcf34448c5bf5526e7 # v3.0
-        with:
-          require: admin
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          permission="$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${GITHUB_ACTOR}/permission" --jq '.permission')"
+          [[ "${permission}" == "admin" ]] || {
+            echo "::error::Manual workflow runs require repository admin permission; ${GITHUB_ACTOR} has ${permission}"
+            exit 1
+          }
 
       - name: Validate workflow sync authentication
         shell: bash
         env:
           AUTH_MODE: ${{ vars.WORKFLOW_SYNC_AUTH_MODE || 'librecode-app' }}
-          LIBRECODE_APP_ID: ${{ vars.LIBRECODE_WORKFLOW_APP_ID }}
+          LIBRECODE_APP_CLIENT_ID: ${{ vars.LIBRECODE_WORKFLOW_APP_CLIENT_ID }}
           LIBRECODE_APP_PRIVATE_KEY: ${{ secrets.LIBRECODE_WORKFLOW_APP_PRIVATE_KEY }}
-          CONSUMER_APP_ID: ${{ vars.WORKFLOW_SYNC_APP_ID }}
+          CONSUMER_APP_CLIENT_ID: ${{ vars.WORKFLOW_SYNC_APP_CLIENT_ID }}
           CONSUMER_APP_PRIVATE_KEY: ${{ secrets.WORKFLOW_SYNC_APP_PRIVATE_KEY }}
           CONSUMER_TOKEN: ${{ secrets.WORKFLOW_SYNC_TOKEN }}
         run: |
@@ -56,14 +66,14 @@ jobs:
 
           case "${AUTH_MODE}" in
             librecode-app)
-              [[ -n "${LIBRECODE_APP_ID}" && -n "${LIBRECODE_APP_PRIVATE_KEY}" ]] || {
-                echo "::error::librecode-app requires LIBRECODE_WORKFLOW_APP_ID and LIBRECODE_WORKFLOW_APP_PRIVATE_KEY"
+              [[ -n "${LIBRECODE_APP_CLIENT_ID}" && -n "${LIBRECODE_APP_PRIVATE_KEY}" ]] || {
+                echo "::error::librecode-app requires LIBRECODE_WORKFLOW_APP_CLIENT_ID and LIBRECODE_WORKFLOW_APP_PRIVATE_KEY"
                 exit 1
               }
               ;;
             github-app)
-              [[ -n "${CONSUMER_APP_ID}" && -n "${CONSUMER_APP_PRIVATE_KEY}" ]] || {
-                echo "::error::github-app requires WORKFLOW_SYNC_APP_ID and WORKFLOW_SYNC_APP_PRIVATE_KEY"
+              [[ -n "${CONSUMER_APP_CLIENT_ID}" && -n "${CONSUMER_APP_PRIVATE_KEY}" ]] || {
+                echo "::error::github-app requires WORKFLOW_SYNC_APP_CLIENT_ID and WORKFLOW_SYNC_APP_PRIVATE_KEY"
                 exit 1
               }
               ;;
@@ -86,7 +96,7 @@ jobs:
         id: librecode-app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ vars.LIBRECODE_WORKFLOW_APP_ID }}
+          client-id: ${{ vars.LIBRECODE_WORKFLOW_APP_CLIENT_ID }}
           private-key: ${{ secrets.LIBRECODE_WORKFLOW_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -99,7 +109,7 @@ jobs:
         id: consumer-app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ vars.WORKFLOW_SYNC_APP_ID }}
+          client-id: ${{ vars.WORKFLOW_SYNC_APP_CLIENT_ID }}
           private-key: ${{ secrets.WORKFLOW_SYNC_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -157,11 +167,12 @@ jobs:
 
       - name: Synchronize workflow templates
         id: sync
-        uses: LibreCodeCoop/.github/actions/sync-workflows@492e6c7c5a9bb7642f39238583003d2cb93f3ba6 # organization helpers
+        uses: ./source/actions/sync-workflows
         with:
           source: source/workflow-templates
           target: target
           catalog-commit: ${{ steps.catalog-revision.outputs.sha }}
+          include: npm-audit-fix.yml
 
       - name: Create Pull Request
         if: ${{ steps.sync.outputs.changed == 'true' }}

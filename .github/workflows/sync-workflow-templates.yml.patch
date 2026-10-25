@@ -1,7 +1,7 @@
 diff --git a/.github/workflows/sync-workflow-templates.yml b/.github/workflows/sync-workflow-templates.yml
 --- a/.github/workflows/sync-workflow-templates.yml
 +++ b/.github/workflows/sync-workflow-templates.yml
-@@ -26,6 +26,8 @@ jobs:
+@@ -29,6 +29,8 @@
        matrix:
          branches:
            - ${{ github.event.repository.default_branch }}
@@ -9,3 +9,12 @@ diff --git a/.github/workflows/sync-workflow-templates.yml b/.github/workflows/s
 +          - 'stable31'
  
      name: Update workflows in ${{ matrix.branches }}
+ 
+@@ -170,6 +172,7 @@
+           source: source/workflow-templates
+           target: target
+           catalog-commit: ${{ steps.catalog-revision.outputs.sha }}
++          include: npm-audit-fix.yml
+ 
+       - name: Create Pull Request
+         if: ${{ steps.sync.outputs.changed == 'true' }}
