@@ -189,8 +189,10 @@ make dist               # build the source package and the app-store archives
 ```
 
 `make appstore` stages only the runtime files, then writes both
-`build/artifacts/extract.tar.gz` and `build/artifacts/extract.zip`. Both
-archives are attached to every GitHub release.
+`build/artifacts/extract.tar.gz` and `build/artifacts/extract.zip`. It packages
+whatever is in `js/`, so run `make build` first on a fresh checkout (or use
+`make dist`, which builds the source package too). Both archives are attached to
+every GitHub release.
 
 ## 🧪 Testing
 

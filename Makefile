@@ -29,35 +29,39 @@ all: build
 # Usage: make bump-version VERSION=x.x.x
 .PHONY: bump-version
 bump-version: bump-info-xml bump-package-json
-	echo "Version bumped to $(VERSION)"
+	@echo "Version bumped to $(VERSION)"
 
 .PHONY: bump-info-xml
 bump-info-xml:
 ifndef VERSION
 	$(error VERSION is undefined. Usage: make bump-version VERSION=x.x.x)
 endif
-	echo "Bumping appinfo/info.xml version to $(VERSION)"
-	sed -i "s|<version>[^<]*</version>|<version>$(VERSION)</version>|" appinfo/info.xml
-	NEW_VERSION=$$(sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' appinfo/info.xml | head -n 1 | xargs); \
+	@echo "Bumping appinfo/info.xml version to $(VERSION)"
+	@sed -i "s|<version>[^<]*</version>|<version>$(VERSION)</version>|" appinfo/info.xml
+	@NEW_VERSION=$$(sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' appinfo/info.xml | head -n 1 | xargs); \
 	if [ "$$NEW_VERSION" != "$(VERSION)" ]; then \
 	echo "ERROR: Failed to update appinfo/info.xml. Expected $(VERSION), got $$NEW_VERSION"; \
 	exit 1; \
 	fi
-	echo "appinfo/info.xml version updated to $(VERSION)"
+	@echo "appinfo/info.xml version updated to $(VERSION)"
 
 .PHONY: bump-package-json
 bump-package-json:
 ifndef VERSION
 	$(error VERSION is undefined. Usage: make bump-version VERSION=x.x.x)
 endif
-	echo "Bumping package.json version to $(VERSION)"
-	node -e "const pkg=require('./package.json'); pkg.version='$(VERSION)'; require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2)+'\n');"
-	NEW_VERSION=$$(node -p "require('./package.json').version"); \
+	@echo "Bumping package.json version to $(VERSION)"
+	@node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); pkg.version='$(VERSION)'; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2)+'\n');"
+	@NEW_VERSION=$$(node -p "require('./package.json').version"); \
 	if [ "$$NEW_VERSION" != "$(VERSION)" ]; then \
 	echo "ERROR: Failed to update package.json. Expected $(VERSION), got $$NEW_VERSION"; \
 	exit 1; \
 	fi
-	echo "package.json version updated to $(VERSION)"
+	@echo "package.json version updated to $(VERSION)"
+	@if [ -f package-lock.json ]; then \
+	node -e "const fs=require('fs'); const l=JSON.parse(fs.readFileSync('package-lock.json','utf8')); l.version='$(VERSION)'; if (l.packages && l.packages['']) { l.packages[''].version='$(VERSION)'; } fs.writeFileSync('package-lock.json', JSON.stringify(l, null, 2)+'\n');"; \
+	echo "package-lock.json version updated to $(VERSION)"; \
+	fi
 
 # === Build targets ===
 .PHONY: build
@@ -71,6 +75,7 @@ npm: build
 .PHONY: install
 install:
 	npm ci
+	composer install --prefer-dist
 
 .PHONY: dev-setup
 dev-setup: clean install build
@@ -114,7 +119,7 @@ source:
 # built frontend lives in js/ and is produced by `make build` beforehand.
 .PHONY: appstore
 appstore:
-	rm -rf $(app_dir)
+	rm -rf $(app_dir) $(appstore_build_directory)/$(app_id).tar.gz $(appstore_build_directory)/$(app_id).zip
 	mkdir -p $(app_dir)
 	rsync -a \
 	--include='CHANGELOG.md' --include='COPYING' \
@@ -147,10 +152,12 @@ appstore:
 	--exclude='openapi.json' \
 	. $(app_dir)/
 	cd $(appstore_build_directory) && tar -czf $(app_id).tar.gz $(app_id)
-	command -v zip >/dev/null 2>&1 && \
-	{ cd $(appstore_build_directory) && zip -rq $(app_id).zip $(app_id); } || \
-	echo "Warning: zip not installed, skipping zip archive"
-	echo "Built $(appstore_build_directory)/$(app_id).tar.gz and $(app_id).zip"
+	@if command -v zip >/dev/null 2>&1; then \
+	cd $(appstore_build_directory) && zip -rq $(app_id).zip $(app_id); \
+	else \
+	echo "Warning: zip not installed, skipping zip archive"; \
+	fi
+	@echo "Built $(appstore_build_directory)/$(app_id).tar.gz and $(app_id).zip"
 
 # === Tests and checks ===
 .PHONY: test
@@ -165,7 +172,7 @@ lint:
 	npm run lint
 
 check-version:
-	if [ "${version}" = "" ]; then\
+	@if [ "${version}" = "" ]; then\
 	echo "Error: You must set version, eg. make -e version=v0.0.1 appstore";\
 	exit 1;\
 	fi

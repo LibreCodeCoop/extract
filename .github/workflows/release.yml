@@ -132,12 +132,6 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@ccf2c627fe61b1b4d924adfcbd19d661a18133a0 # v2.35.2
-        with:
-          php-version: '8.3'
-          coverage: none
-
       - name: Verify the released version in appinfo/info.xml
         env:
           EXPECTED: ${{ needs.release.outputs.version }}
@@ -188,11 +182,18 @@ jobs:
           TAG="v${{ needs.release.outputs.version }}"
           echo "Uploading release assets for: $TAG"
 
+          # Fail before publishing if an expected archive is missing, otherwise
+          # the release would go public without the asset it promises.
           for FILE in build/artifacts/extract.tar.gz build/artifacts/extract.zip; do
-            if [ -f "$FILE" ]; then
-              gh release upload "$TAG" "$FILE" --clobber
-              echo "Uploaded: $FILE"
+            if [ ! -f "$FILE" ]; then
+              echo "::error::Expected release asset $FILE was not built"
+              exit 1
             fi
+          done
+
+          for FILE in build/artifacts/extract.tar.gz build/artifacts/extract.zip; do
+            gh release upload "$TAG" "$FILE" --clobber
+            echo "Uploaded: $FILE"
           done
 
           # Publish the draft only now that the archives are attached, so a

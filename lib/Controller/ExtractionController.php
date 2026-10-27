@@ -54,6 +54,17 @@ final class ExtractionController extends AEnvironmentAwareController {
 		'application/x-compressed' => 'other',
 	];
 
+	/**
+	 * File-name extensions of compressed tarballs.
+	 *
+	 * A compressed tarball needs two passes: first the wrapper (gzip, bzip2,
+	 * xz) is unwrapped, then the inner tar is expanded. `.tar.gz` is covered by
+	 * the generic `tar` suffix check on the file name; the single-suffix
+	 * variants below must be listed explicitly because they do not end in
+	 * `.tar`.
+	 */
+	private const COMPRESSED_TARBALL_EXTENSIONS = ['tgz', 'tbz', 'tbz2', 'txz', 'tar.gz', 'tar.bz2', 'tar.xz'];
+
 	/** @var Folder */
 	private $userFolder;
 
@@ -76,6 +87,104 @@ final class ExtractionController extends AEnvironmentAwareController {
 	private function getFile(string $directory, string $fileName): string|false {
 		$fileNode = $this->userFolder->get($directory . '/' . $fileName);
 		return $fileNode->getStorage()->getLocalFile($fileNode->getInternalPath());
+	}
+
+	/**
+	 * Whether a file name refers to a tar wrapped in a compression layer.
+	 *
+	 * @param string $fileName The Nextcloud file name.
+	 */
+	private static function isCompressedTarball(string $fileName): bool {
+		$lower = strtolower($fileName);
+		if (str_ends_with($lower, '.tar')) {
+			return true;
+		}
+		foreach (self::COMPRESSED_TARBALL_EXTENSIONS as $extension) {
+			if (str_ends_with($lower, '.' . $extension)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Extract a tar that is wrapped in a compression layer.
+	 *
+	 * The wrapper is unwrapped into a scratch directory first, then the inner
+	 * tar is expanded into the destination. The inner tar is found by scanning
+	 * the scratch directory because 7za names it from the compression header
+	 * rather than from the archive file name.
+	 *
+	 * @param string $file The local file-system path of the archive.
+	 * @param string $extractTo The local file-system path of the destination.
+	 * @return array{code: 0|1, desc?: string}
+	 */
+	private function extractCompressedTarball(string $file, string $extractTo): array {
+		$scratch = $extractTo . '.unwrapped';
+
+		$response = $this->extractionService->extractOther($file, $scratch);
+		if (($response['code'] ?? 0) === 0) {
+			$this->removeDirectory($scratch);
+			return $response;
+		}
+
+		$innerTar = $this->findSingleFile($scratch);
+		if ($innerTar === null) {
+			$this->logger->error(__METHOD__ . ': no inner tar found in ' . $scratch);
+			$this->removeDirectory($scratch);
+			return ['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')];
+		}
+
+		$response = $this->extractionService->extractOther($innerTar, $extractTo);
+		$this->removeDirectory($scratch);
+
+		return $response;
+	}
+
+	/**
+	 * Return the only file inside a directory, or null when there is not
+	 * exactly one file.
+	 *
+	 * @param string $directory The directory to inspect.
+	 */
+	private function findSingleFile(string $directory): ?string {
+		if (!is_dir($directory)) {
+			return null;
+		}
+
+		$files = [];
+		$iterator = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+		);
+		foreach ($iterator as $entry) {
+			/** @var \SplFileInfo $entry */
+			if ($entry->isFile()) {
+				$files[] = $entry->getPathname();
+			}
+		}
+
+		return count($files) === 1 ? $files[0] : null;
+	}
+
+	/**
+	 * Recursively remove a directory, ignoring a missing one.
+	 *
+	 * @param string $directory The directory to remove.
+	 */
+	private function removeDirectory(string $directory): void {
+		if (!is_dir($directory)) {
+			return;
+		}
+
+		$iterator = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+			\RecursiveIteratorIterator::CHILD_FIRST,
+		);
+		foreach ($iterator as $entry) {
+			/** @var \SplFileInfo $entry */
+			$entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
+		}
+		rmdir($directory);
 	}
 
 	/**
@@ -133,7 +242,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 		bool $external,
 		string $mime,
 	): DataResponse {
-		if (!isset(self::SUPPORTED_MIME_TYPES[$mime])) {
+		if (isset(self::SUPPORTED_MIME_TYPES[$mime]) === false) {
 			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Unsupported archive type')]);
 		}
 
@@ -189,17 +298,8 @@ final class ExtractionController extends AEnvironmentAwareController {
 				$response = $this->extractionService->extractRar($file, $extractTo);
 				break;
 			default:
-				// Check if the file is .tar.gz in order to do the extraction on a single step
-				if (pathinfo($fileName, PATHINFO_EXTENSION) == 'tar') {
-					$cleanFileName = pathinfo($fileName, PATHINFO_FILENAME);
-					$extractTo = dirname($extractTo) . '/' . $cleanFileName;
-					$response = $this->extractionService->extractOther($file, $extractTo);
-					$file = $extractTo . '/' . pathinfo($file, PATHINFO_FILENAME);
-					$fileName = $cleanFileName;
-					$response = $this->extractionService->extractOther($file, $extractTo);
-
-					// remove .tar file
-					unlink($file);
+				if (self::isCompressedTarball($nameOfFile)) {
+					$response = $this->extractCompressedTarball($file, $extractTo);
 				} else {
 					$response = $this->extractionService->extractOther($file, $extractTo);
 				}

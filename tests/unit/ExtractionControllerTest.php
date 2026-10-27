@@ -55,4 +55,62 @@ final class ExtractionControllerTest extends TestCase {
 			self::assertContains($strategy, ['zip', 'rar', 'other'], "$mime maps to unknown strategy $strategy");
 		}
 	}
+
+	/**
+	 * Compressed tarballs must be recognised by every spelling users and
+	 * Nextcloud produce, otherwise the inner tar is left behind as a file.
+	 */
+	public function testCompressedTarballsAreRecognised(): void {
+		$method = new \ReflectionMethod(ExtractionController::class, 'isCompressedTarball');
+
+		$tarballs = [
+			'archive.tar',
+			'archive.tar.gz',
+			'archive.tar.bz2',
+			'archive.tar.xz',
+			'archive.tgz',
+			'archive.tbz',
+			'archive.tbz2',
+			'archive.txz',
+			'ARCHIVE.TGZ',
+		];
+		foreach ($tarballs as $name) {
+			self::assertTrue($method->invoke(null, $name), "$name should be treated as a compressed tarball");
+		}
+	}
+
+	public function testPlainArchivesAreNotTreatedAsCompressedTarballs(): void {
+		$method = new \ReflectionMethod(ExtractionController::class, 'isCompressedTarball');
+
+		foreach (['archive.zip', 'archive.7z', 'archive.rar', 'archive.deb', 'archive.gz'] as $name) {
+			self::assertFalse($method->invoke(null, $name), "$name should not be treated as a compressed tarball");
+		}
+	}
+
+	/**
+	 * The frontend gates the action on its own copy of the archive MIME list, so
+	 * the two lists must not drift apart.
+	 */
+	public function testTheFrontendAndBackendMimeListsAgree(): void {
+		$action = file_get_contents(__DIR__ . '/../../src/actions/extract-action.ts');
+		self::assertIsString($action);
+
+		preg_match('/SUPPORTED_ARCHIVE_MIME_TYPES\s*=\s*\[(.*?)\]/s', $action, $matches);
+		self::assertNotEmpty($matches, 'Could not find SUPPORTED_ARCHIVE_MIME_TYPES in the file action');
+
+		preg_match_all("/'([^']+)'/", $matches[1], $frontendMatches);
+		$frontend = $frontendMatches[1];
+		self::assertNotEmpty($frontend, 'The frontend MIME list is empty');
+
+		$backend = array_keys(ExtractionController::SUPPORTED_MIME_TYPES);
+
+		sort($frontend);
+		sort($backend);
+
+		self::assertSame(
+			$backend,
+			$frontend,
+			'The frontend and backend archive MIME lists have drifted apart',
+		);
+	}
 }

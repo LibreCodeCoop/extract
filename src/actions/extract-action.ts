@@ -42,6 +42,16 @@ interface ExtractedFolder {
 	'owner-display-name': string | null
 }
 
+interface ExtractionResponse {
+	ocs: {
+		data: {
+			code?: number
+			desc?: string
+			extracted?: ExtractedFolder
+		}
+	}
+}
+
 /**
  * Resolve the archive MIME type of a node.
  *
@@ -79,8 +89,8 @@ function isEnabled(context: ActionContext): boolean {
 		return false
 	}
 
-	const node = context.nodes[0]!
-	if (!isSupportedArchive(node)) {
+	const [node] = context.nodes
+	if (node === undefined || !isSupportedArchive(node)) {
 		return false
 	}
 
@@ -90,10 +100,17 @@ function isEnabled(context: ActionContext): boolean {
 /**
  * Extract the selected archive and add the resulting folder to the file list.
  *
+ * Returns false when the extraction failed, which makes the Files app show a
+ * failure notification, and throws with the server's message so that message is
+ * shown to the user.
+ *
  * @param context The file action context
  */
 async function exec(context: ActionContextSingle): Promise<boolean | null> {
-	const node = context.nodes[0]
+	const [node] = context.nodes
+	if (node === undefined) {
+		return false
+	}
 
 	const data = {
 		nameOfFile: node.basename,
@@ -104,34 +121,40 @@ async function exec(context: ActionContextSingle): Promise<boolean | null> {
 
 	const url = generateOcsUrl('/apps/extract/api/v1/extraction/execute')
 
-	try {
-		const { data: response } = await axios.post<{ ocs: { data: { extracted: ExtractedFolder } } }>(url, data)
-		const extracted = response.ocs.data.extracted
+	const { data: response } = await axios.post<ExtractionResponse>(url, data)
+	const { code, desc, extracted } = response.ocs.data
 
-		const folder = new Folder({
-			id: extracted.fileId,
-			source: extracted.source,
-			root: extracted.root,
-			owner: extracted.owner,
-			permissions: extracted.permissions,
-			mtime: new Date(extracted.mtime * 1000),
-			attributes: {
-				'mount-type': extracted['mount-type'],
-				'owner-id': extracted.owner,
-				'owner-display-name': extracted['owner-display-name'],
-			},
-		})
-
-		emit('files:node:created', folder)
-
-		window.OCP.Files.Router.goToRoute(
-			null,
-			{ view: 'files', fileid: String(extracted.fileId) },
-			{ dir: context.folder.path },
-		)
-	} catch (error) {
-		console.error('Could not send extract request.', error)
+	if (code === 0) {
+		// The server explained why it refused (encryption, missing file, an
+		// unsupported type). Surface that instead of failing silently.
+		throw new Error(desc ?? t('extract', 'Extraction failed'))
 	}
+
+	if (extracted === undefined) {
+		throw new Error(t('extract', 'Extraction failed'))
+	}
+
+	const folder = new Folder({
+		id: extracted.fileId,
+		source: extracted.source,
+		root: extracted.root,
+		owner: extracted.owner,
+		permissions: extracted.permissions,
+		mtime: new Date(extracted.mtime * 1000),
+		attributes: {
+			'mount-type': extracted['mount-type'],
+			'owner-id': extracted.owner,
+			'owner-display-name': extracted['owner-display-name'],
+		},
+	})
+
+	emit('files:node:created', folder)
+
+	window.OCP.Files.Router.goToRoute(
+		null,
+		{ view: 'files', fileid: String(extracted.fileId) },
+		{ dir: context.folder.path },
+	)
 
 	return null
 }
