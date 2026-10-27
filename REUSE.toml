@@ -29,6 +29,7 @@ path = [
     "package-lock.json",
     "package.json",
     "psalm.xml",
+    "tsconfig.json",
     "src/types/openapi/openapi.ts",
     "tests/psalm-baseline.xml",
     "vendor-bin/**/composer.json",
