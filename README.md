@@ -75,7 +75,11 @@ brew install p7zip
    [releases page](https://github.com/ashcoft/extract/releases).
 2. Extract it into your Nextcloud `apps` directory:
    ```bash
+   # For extract.tar.gz:
    tar -xzf extract.tar.gz -C /path/to/nextcloud/apps
+   # For extract.zip:
+   unzip extract.zip -d /path/to/nextcloud/apps
+
    chown -R www-data:www-data /path/to/nextcloud/apps/extract
    ```
    The archive already contains the built frontend assets, so no Node.js step is
@@ -153,7 +157,7 @@ interrupted, that temporary folder is removed before the new extraction starts.
 - Node.js 24+
 - npm 10.5+
 - PHP 8.1+ with the `zip` extension
-- Nextcloud 33+ development environment
+- Nextcloud 33-35 development environment
 
 ### Setup
 
@@ -242,11 +246,19 @@ commit so the next release continues from the declared version.
 
 ### "Oops something went wrong."
 
-This message means the archive tool could not run.
+The archive tool could not unpack the file. Common causes:
 
-- For Rar archives, install the PHP `rar` extension or the `unrar` binary.
-- For every other format, install `p7zip` and `p7zip-full` and check that `7za`
-  is on the `PATH` of the web server user.
+- **Tool missing**: for Rar archives install the PHP `rar` extension or the
+  `unrar` binary; for every other format install `p7zip` and `p7zip-full` and
+  check that `7za` is on the `PATH` of the web server user.
+- **Damaged or unreadable archive**: the file is truncated, corrupt, or not
+  actually an archive of that format.
+- **Permissions**: the web server user cannot read the archive or write into the
+  target folder.
+- **Insufficient space** on the volume holding the archive.
+
+The Nextcloud log entry for the failure records the tool's exit code and output,
+which distinguishes these cases.
 
 ### "Encryption is not supported yet"
 
@@ -271,8 +283,19 @@ Contributions are welcome.
    message, for example `fix: handle empty archives`.
 6. **Push** the branch and open a Pull Request.
 
-The commit type drives the release: `feat` cuts a minor release, `fix` a patch,
-and `chore`/`docs`/`ci`/`test`/`refactor` do not release.
+The commit type drives the release:
+
+| Commit | Release |
+|--------|---------|
+| breaking change (`feat!`, `BREAKING CHANGE`) | major |
+| `feat` | minor |
+| `perf` | minor |
+| `fix(deps)` | minor |
+| `fix` (any other scope) | patch |
+| `chore`, `docs`, `test`, `ci`, `refactor`, `style`, `build`, `revert` | none |
+
+So a dependency fix bumps the minor version, while an ordinary bug fix bumps the
+patch version.
 
 ## 📄 License
 
