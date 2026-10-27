@@ -1,0 +1,11 @@
+diff --git a/.github/workflows/sync-workflow-templates.yml b/.github/workflows/sync-workflow-templates.yml
+--- a/.github/workflows/sync-workflow-templates.yml
++++ b/.github/workflows/sync-workflow-templates.yml
+@@ -170,6 +170,7 @@
+           source: source/workflow-templates
+           target: target
+           catalog-commit: ${{ steps.catalog-revision.outputs.sha }}
++          include: npm-audit-fix.yml
+ 
+       - name: Create Pull Request
+         if: ${{ steps.sync.outputs.changed == 'true' }}
