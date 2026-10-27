@@ -33,20 +33,29 @@ use Psr\Log\LoggerInterface;
  */
 final class ExtractionController extends AEnvironmentAwareController {
 
-	/** @var Folder */
-	private $userFolder;
-
-	/** @var Array $mimeTypes */
-	private array $mimeTypes = [
+	/**
+	 * Archive MIME types the app can extract, mapped to the extraction strategy.
+	 *
+	 * The keys must cover every MIME type Nextcloud resolves for the supported
+	 * archive extensions (see resources/config/mimetypemapping.dist.json), so a
+	 * file selected in the Files app always maps to a strategy. `application/gzip`
+	 * is what Nextcloud reports for .gz and .tgz; `application/x-gzip` is kept
+	 * because other tooling still emits it.
+	 */
+	public const SUPPORTED_MIME_TYPES = [
 		'application/zip' => 'zip',
 		'application/x-rar-compressed' => 'rar',
 		'application/x-tar' => 'other',
+		'application/gzip' => 'other',
+		'application/x-gzip' => 'other',
 		'application/x-7z-compressed' => 'other',
 		'application/x-bzip2' => 'other',
 		'application/x-deb' => 'other',
-		'application/x-gzip' => 'other',
-		'application/x-compressed' => 'other'
+		'application/x-compressed' => 'other',
 	];
+
+	/** @var Folder */
+	private $userFolder;
 
 	public function __construct(
 		string $AppName,
@@ -124,7 +133,11 @@ final class ExtractionController extends AEnvironmentAwareController {
 		bool $external,
 		string $mime,
 	): DataResponse {
-		$type = $this->mimeTypes[$mime];
+		if (!isset(self::SUPPORTED_MIME_TYPES[$mime])) {
+			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Unsupported archive type')]);
+		}
+
+		$type = self::SUPPORTED_MIME_TYPES[$mime];
 
 		if ($this->encryptionManager->isEnabled()) {
 			$response = [];
