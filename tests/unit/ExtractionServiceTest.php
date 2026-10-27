@@ -104,6 +104,10 @@ final class ExtractionServiceTest extends TestCase {
 	}
 
 	public function testExtractOtherReportsFailureWhenTheArchiveCannotBeRead(): void {
+		if (trim((string)shell_exec('command -v 7za 2>/dev/null')) === '') {
+			self::markTestSkipped('7za is not installed, the failure branch cannot be exercised');
+		}
+
 		$archive = $this->tmpDir . '/broken.7z';
 		file_put_contents($archive, 'not a real 7z archive');
 
@@ -111,6 +115,27 @@ final class ExtractionServiceTest extends TestCase {
 
 		self::assertSame(0, $response['code']);
 		self::assertArrayHasKey('desc', $response);
+	}
+
+	public function testExtractOtherExtractsAValidArchive(): void {
+		if (trim((string)shell_exec('command -v 7za 2>/dev/null')) === '') {
+			self::markTestSkipped('7za is not installed, the success branch cannot be exercised');
+		}
+
+		$source = $this->tmpDir . '/source';
+		mkdir($source, 0777, true);
+		file_put_contents($source . '/hello.txt', 'hello world');
+
+		$archive = $this->tmpDir . '/valid.7z';
+		exec('7za a ' . escapeshellarg($archive) . ' ' . escapeshellarg($source . '/hello.txt') . ' >/dev/null 2>&1', $out, $return);
+		self::assertSame(0, $return, 'Could not build the fixture archive');
+
+		$destination = $this->tmpDir . '/out';
+		$response = $this->service->extractOther($archive, $destination);
+
+		self::assertSame(['code' => 1], $response);
+		self::assertFileExists($destination . '/hello.txt');
+		self::assertSame('hello world', file_get_contents($destination . '/hello.txt'));
 	}
 
 	public function testExtractRarReportsFailureWhenNoRarSupportIsAvailable(): void {
