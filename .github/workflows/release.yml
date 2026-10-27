@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 LibreCode coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 name: Release
 
 on:
@@ -5,18 +8,44 @@ on:
     branches:
       - main
       - master
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no release)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
+  # Determine the next version and let semantic-release bump
+  # appinfo/info.xml and package.json, commit them and create the tag.
+  #
+  # This runs BEFORE the build so the archives are packaged from the released
+  # version. Building first produced archives whose appinfo/info.xml still
+  # carried the previous tag's version.
   release:
+    name: Release & Publish
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, 'skip release')"
-
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      published: ${{ steps.semantic.outputs.published }}
+      version: ${{ steps.semantic.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -24,36 +53,149 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - name: Setup PHP
+      # semantic-release derives the next version from the newest tag. If the
+      # declared app version is ahead of that tag, it would cut a lower version
+      # and ship a downgrade, which Nextcloud rejects. Fail early instead.
+      - name: Verify the release baseline matches the app version
+        run: |
+          APP_VERSION=$(sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' appinfo/info.xml | head -n 1 | xargs)
+          LATEST_TAG=$(git tag --sort=-v:refname | head -n 1)
+          echo "appinfo version: $APP_VERSION"
+          echo "latest tag: ${LATEST_TAG:-<none>}"
+
+          if [ -z "$LATEST_TAG" ]; then
+            exit 0
+          fi
+
+          LATEST_TAG_VERSION=${LATEST_TAG#v}
+          NEWEST=$(printf '%s\n%s\n' "$APP_VERSION" "$LATEST_TAG_VERSION" | sort -V | tail -n 1)
+          if [ "$NEWEST" = "$APP_VERSION" ] && [ "$APP_VERSION" != "$LATEST_TAG_VERSION" ]; then
+            echo "::error::appinfo/info.xml ($APP_VERSION) is newer than the latest tag ($LATEST_TAG). Tag the current commit (git tag v$APP_VERSION && git push origin v$APP_VERSION) so the next release continues from $APP_VERSION."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        env:
+          CYPRESS_INSTALL_BINARY: 0
+        run: npm ci
+
+      - name: Semantic Release
+        id: semantic
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            npx semantic-release --dry-run
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BEFORE_SHA=$(git rev-parse HEAD)
+          npx semantic-release
+          AFTER_SHA=$(git rev-parse HEAD)
+
+          # Read the tag semantic-release created on this commit rather than
+          # comparing globally newest tags: a release on one branch can be
+          # lower than an existing tag on another.
+          VERSION=$(git tag --points-at HEAD --sort=-v:refname | head -n1)
+          if [ -n "$VERSION" ] && [ "$AFTER_SHA" != "$BEFORE_SHA" ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+
+  # Build the app archives from the released version and attach them to the tag.
+  build:
+    name: Build Nextcloud App
+    runs-on: ubuntu-latest
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    permissions:
+      contents: write
+    steps:
+      # Check out the release tag so appinfo/info.xml matches the version.
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Set up PHP
         uses: shivammathur/setup-php@ccf2c627fe61b1b4d924adfcbd19d661a18133a0 # v2.35.2
         with:
           php-version: '8.3'
-          tools: composer
+          coverage: none
 
-      - name: Get composer cache directory
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-
-      - name: Cache composer dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
+      - name: Verify the released version in appinfo/info.xml
+        env:
+          EXPECTED: ${{ needs.release.outputs.version }}
+        run: |
+          ACTUAL=$(sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' appinfo/info.xml | head -n 1 | xargs)
+          echo "info.xml version: $ACTUAL (expected $EXPECTED)"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::appinfo/info.xml version ($ACTUAL) does not match the release ($EXPECTED)"
+            exit 1
+          fi
 
       - name: Install dependencies
-        run: |
-          composer install --prefer-dist --no-progress
-          npm ci
+        env:
+          CYPRESS_INSTALL_BINARY: 0
+        run: npm ci
 
       - name: Build Nextcloud app
-        run: make npm appstore
+        run: make build
 
-      - name: Semantic Release
-        run: npx semantic-release
+      - name: Ensure zip is available
+        run: |
+          if ! command -v zip >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y zip
+          fi
+
+      - name: Build app archives
+        run: |
+          make appstore
+          echo "=== Built artifacts ==="
+          ls -la build/artifacts/
+
+      - name: Verify the archive version matches the release
+        env:
+          EXPECTED: ${{ needs.release.outputs.version }}
+        run: |
+          ACTUAL=$(tar -xzf build/artifacts/extract.tar.gz -O extract/appinfo/info.xml \
+            | sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' | head -n 1 | xargs)
+          echo "archive info.xml version: $ACTUAL (expected $EXPECTED)"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Archive version ($ACTUAL) does not match the release ($EXPECTED)"
+            exit 1
+          fi
+
+      - name: Upload artifacts to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GIT_AUTHOR_NAME: semantic-release
-          GIT_AUTHOR_EMAIL: semantic-release@github.com
-          GIT_COMMITTER_NAME: semantic-release
-          GIT_COMMITTER_EMAIL: semantic-release@github.com
+        run: |
+          TAG="v${{ needs.release.outputs.version }}"
+          echo "Uploading release assets for: $TAG"
+
+          for FILE in build/artifacts/extract.tar.gz build/artifacts/extract.zip; do
+            if [ -f "$FILE" ]; then
+              gh release upload "$TAG" "$FILE" --clobber
+              echo "Uploaded: $FILE"
+            fi
+          done
+
+          # Publish the draft only now that the archives are attached, so a
+          # release never goes public without its assets.
+          gh release edit "$TAG" --draft=false
+          echo "Published release $TAG"

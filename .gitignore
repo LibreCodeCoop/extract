@@ -10,4 +10,8 @@
 /js/
 node_modules/
 
+# Build output (packaged archives are attached to GitHub releases)
+/build/
+
 /.php-cs-fixer.cache
+/tests/.phpunit.cache
