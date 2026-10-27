@@ -98,11 +98,31 @@ function isEnabled(context: ActionContext): boolean {
 }
 
 /**
+ * Build the folder node the server created.
+ *
+ * @param extracted The folder description returned by the server
+ */
+function toFolder(extracted: ExtractedFolder): Folder {
+	return new Folder({
+		id: extracted.fileId,
+		source: extracted.source,
+		root: extracted.root,
+		owner: extracted.owner,
+		permissions: extracted.permissions,
+		mtime: new Date(extracted.mtime * 1000),
+		attributes: {
+			'mount-type': extracted['mount-type'],
+			'owner-id': extracted.owner,
+			'owner-display-name': extracted['owner-display-name'],
+		},
+	})
+}
+
+/**
  * Extract the selected archive and add the resulting folder to the file list.
  *
- * Returns false when the extraction failed, which makes the Files app show a
- * failure notification, and throws with the server's message so that message is
- * shown to the user.
+ * Throws with the server's message when the extraction failed, so the Files app
+ * shows the reason to the user instead of failing silently.
  *
  * @param context The file action context
  */
@@ -120,34 +140,16 @@ async function exec(context: ActionContextSingle): Promise<boolean | null> {
 	}
 
 	const url = generateOcsUrl('/apps/extract/api/v1/extraction/execute')
-
 	const { data: response } = await axios.post<ExtractionResponse>(url, data)
 	const { code, desc, extracted } = response.ocs.data
 
-	if (code === 0) {
-		// The server explained why it refused (encryption, missing file, an
+	if (code === 0 || extracted === undefined) {
+		// The server explained why it refused (encryption, a missing file, an
 		// unsupported type). Surface that instead of failing silently.
 		throw new Error(desc ?? t('extract', 'Extraction failed'))
 	}
 
-	if (extracted === undefined) {
-		throw new Error(t('extract', 'Extraction failed'))
-	}
-
-	const folder = new Folder({
-		id: extracted.fileId,
-		source: extracted.source,
-		root: extracted.root,
-		owner: extracted.owner,
-		permissions: extracted.permissions,
-		mtime: new Date(extracted.mtime * 1000),
-		attributes: {
-			'mount-type': extracted['mount-type'],
-			'owner-id': extracted.owner,
-			'owner-display-name': extracted['owner-display-name'],
-		},
-	})
-
+	const folder = toFolder(extracted)
 	emit('files:node:created', folder)
 
 	window.OCP.Files.Router.goToRoute(
