@@ -27,6 +27,9 @@ final class WrappedTarballExtractionTest extends TestCase {
 	private ExtractionController $controller;
 	private string $tmpDir;
 
+	/**
+	 * Prepare a controller wired to the real extraction service.
+	 */
 	protected function setUp(): void {
 		parent::setUp();
 
@@ -54,16 +57,30 @@ final class WrappedTarballExtractionTest extends TestCase {
 		mkdir($this->tmpDir, 0777, true);
 	}
 
+	/**
+	 * Remove the working directory.
+	 */
 	protected function tearDown(): void {
 		$this->removeDirectory($this->tmpDir);
 		parent::tearDown();
 	}
 
+	/**
+	 * Inject a private property on the controller under test.
+	 *
+	 * @param string $name The property name.
+	 * @param object $value The value to assign.
+	 */
 	private function setProperty(string $name, object $value): void {
 		$property = new \ReflectionProperty(ExtractionController::class, $name);
 		$property->setValue($this->controller, $value);
 	}
 
+	/**
+	 * Recursively remove a directory, ignoring a missing one.
+	 *
+	 * @param string $path The directory to remove.
+	 */
 	private function removeDirectory(string $path): void {
 		if (is_dir($path) === false) {
 			return;
@@ -108,6 +125,9 @@ final class WrappedTarballExtractionTest extends TestCase {
 		return $path;
 	}
 
+	/**
+	 * A wrapped tarball is unwrapped and expanded into the destination.
+	 */
 	public function testAWrappedTarballIsUnpackedIntoTheDestination(): void {
 		$archive = $this->createTar($this->tmpDir . '/data.tar', true);
 
@@ -121,6 +141,9 @@ final class WrappedTarballExtractionTest extends TestCase {
 		self::assertFileExists($destination . '/nested/inside.txt');
 	}
 
+	/**
+	 * The request-owned scratch directory does not outlive the extraction.
+	 */
 	public function testTheScratchDirectoryIsRemovedAfterwards(): void {
 		$archive = $this->createTar($this->tmpDir . '/data.tar', true);
 

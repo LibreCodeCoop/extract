@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import type { ActionContext, ActionContextSingle, IFileAction, INode } from '@nextcloud/files'
+import type { ActionContext, ActionContextSingle, IFileAction, IFolder, INode } from '@nextcloud/files'
 
 import ArchiveArrowUpSvg from '@mdi/svg/svg/archive-arrow-up.svg?raw'
 import axios from '@nextcloud/axios'
@@ -56,9 +56,10 @@ interface ExtractionResponse {
 /**
  * Resolve the archive MIME type of a node.
  *
- * `node.mime` is the resolved MIME type. It falls back to `application/octet-stream`
- * when the type could not be determined, in which case the raw DAV property is
- * used so an unresolved archive can still be recognised.
+ * `node.mime` is the resolved MIME type. It falls back to
+ * `application/octet-stream` when the type could not be determined, in which
+ * case the raw DAV property is used so an unresolved archive can still be
+ * recognised.
  *
  * @param node The node to inspect
  */
@@ -81,21 +82,12 @@ function isSupportedArchive(node: INode): boolean {
 }
 
 /**
- * Whether the action applies to the current selection.
+ * Whether a node lives on an external storage.
  *
- * @param context The file action context
+ * @param node The node to inspect
  */
-function isEnabled(context: ActionContext): boolean {
-	if (context.nodes.length !== 1) {
-		return false
-	}
-
-	const [node] = context.nodes
-	if (node === undefined || !isSupportedArchive(node)) {
-		return false
-	}
-
-	return (node.permissions & Permission.UPDATE) !== 0
+function isExternalStorage(node: INode): boolean {
+	return String(node.attributes?.['mount-type'] ?? '').startsWith('external')
 }
 
 /**
@@ -120,13 +112,59 @@ function toFolder(extracted: ExtractedFolder): Folder {
 }
 
 /**
- * Extract the selected archive and add the resulting folder to the file list.
+ * Read the extracted folder out of an OCS response.
  *
  * A refusal the server describes (encryption enabled, a missing file, an
- * unsupported type) is shown with showError, because the Files app only renders
- * a generic "{action}: failed" message when exec throws. Transport errors
- * (a rejected request, or a 500 from a failed extraction) propagate to the
- * Files app's own error handling.
+ * unsupported type) is shown with showError, because the Files app renders only
+ * a generic "{action}: failed" message when exec throws.
+ *
+ * @param response The parsed OCS response
+ */
+function readExtractedFolder(response: ExtractionResponse): ExtractedFolder {
+	const { code, desc, extracted } = response.ocs.data
+
+	if (code === 0 || extracted === undefined) {
+		const reason = desc ?? t('extract', 'Extraction failed')
+		showError(reason)
+		throw new Error(reason)
+	}
+
+	return extracted
+}
+
+/**
+ * Build the request body for the extraction endpoint.
+ *
+ * @param node The archive to extract
+ * @param folder The folder the archive lives in
+ */
+function buildRequestBody(node: INode, folder: IFolder) {
+	return {
+		nameOfFile: node.basename,
+		directory: folder.path,
+		external: isExternalStorage(node) ? 1 : 0,
+		mime: archiveMimeOf(node),
+	}
+}
+
+/**
+ * Whether the action applies to the current selection.
+ *
+ * @param context The file action context
+ */
+function isEnabled(context: ActionContext): boolean {
+	if (context.nodes.length !== 1) {
+		return false
+	}
+
+	const [node] = context.nodes
+	return node !== undefined
+		&& isSupportedArchive(node)
+		&& (node.permissions & Permission.UPDATE) !== 0
+}
+
+/**
+ * Extract the selected archive and add the resulting folder to the file list.
  *
  * @param context The file action context
  */
@@ -136,28 +174,14 @@ async function exec(context: ActionContextSingle): Promise<boolean | null> {
 		return false
 	}
 
-	const data = {
-		nameOfFile: node.basename,
-		directory: context.folder.path,
-		external: String(node.attributes?.['mount-type'] ?? '').startsWith('external') ? 1 : 0,
-		mime: archiveMimeOf(node),
-	}
-
 	const url = generateOcsUrl('/apps/extract/api/v1/extraction/execute')
-	const { data: response } = await axios.post<ExtractionResponse>(url, data)
-	const { code, desc, extracted } = response.ocs.data
+	const { data: response } = await axios.post<ExtractionResponse>(
+		url,
+		buildRequestBody(node, context.folder),
+	)
+	const extracted = readExtractedFolder(response)
 
-	if (code === 0 || extracted === undefined) {
-		// The server refused and explained why (encryption enabled, a missing file,
-		// an unsupported type). The Files app renders only a generic
-		// "{action}: failed" message when exec throws, so show the reason here.
-		const reason = desc ?? t('extract', 'Extraction failed')
-		showError(reason)
-		throw new Error(reason)
-	}
-
-	const folder = toFolder(extracted)
-	emit('files:node:created', folder)
+	emit('files:node:created', toFolder(extracted))
 
 	window.OCP.Files.Router.goToRoute(
 		null,
