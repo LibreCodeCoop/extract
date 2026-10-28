@@ -18,10 +18,10 @@ use Psr\Log\LoggerInterface;
 /**
  * End-to-end checks for the two-pass tarball path.
  *
- * These run the real ExtractionService against real archives on disk. They exist
- * because the unit tests for the routing helpers alone did not catch two
- * regressions: a plain `.tar` being sent down the two-pass path (7za expands it
- * in a single pass), and a failed extraction still reaching the post-processing.
+ * These run the real ExtractionService against real archives on disk. The unit
+ * tests for the routing helpers alone were not enough: they cannot tell whether
+ * a wrapped tarball actually round-trips, and they missed a plain `.tar` being
+ * routed through the two-pass path.
  */
 final class WrappedTarballExtractionTest extends TestCase {
 	private ExtractionController $controller;

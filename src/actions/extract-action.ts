@@ -115,18 +115,18 @@ function toFolder(extracted: ExtractedFolder): Folder {
  * Read the extracted folder out of an OCS response.
  *
  * A refusal the server describes (encryption enabled, a missing file, an
- * unsupported type) is shown with showError, because the Files app renders only
- * a generic "{action}: failed" message when exec throws.
+ * unsupported type) is reported with showError and signalled by returning null.
+ * Throwing is deliberately avoided: the Files app would then also show its own
+ * generic "{action}: failed" notification, so the user would see two messages.
  *
  * @param response The parsed OCS response
  */
-function readExtractedFolder(response: ExtractionResponse): ExtractedFolder {
+function readExtractedFolder(response: ExtractionResponse): ExtractedFolder | null {
 	const { code, desc, extracted } = response.ocs.data
 
 	if (code === 0 || extracted === undefined) {
-		const reason = desc ?? t('extract', 'Extraction failed')
-		showError(reason)
-		throw new Error(reason)
+		showError(desc ?? t('extract', 'Extraction failed'))
+		return null
 	}
 
 	return extracted
@@ -180,6 +180,11 @@ async function exec(context: ActionContextSingle): Promise<boolean | null> {
 		buildRequestBody(node, context.folder),
 	)
 	const extracted = readExtractedFolder(response)
+	if (extracted === null) {
+		// The reason was already shown; stay silent so the Files app does not add
+		// a second, generic notification.
+		return null
+	}
 
 	emit('files:node:created', toFolder(extracted))
 
