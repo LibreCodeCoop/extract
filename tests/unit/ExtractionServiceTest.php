@@ -11,15 +11,20 @@ namespace OCA\Extract\Tests\unit;
 
 use OCA\Extract\Service\ExtractionService;
 use OCP\IL10N;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use ZipArchive;
 
+/**
+ * Tests for the extraction service.
+ *
+ * The zip and 7z fixtures are built on disk and extracted for real, so the
+ * assertions cover the tool invocation and not just the return shape.
+ */
 final class ExtractionServiceTest extends TestCase {
-	private ExtractionService $service;
-	private IL10N&MockObject $l10n;
-	private LoggerInterface&MockObject $logger;
+	private ?ExtractionService $service = null;
+	private ?IL10N $l10n = null;
+	private ?LoggerInterface $logger = null;
 	private string $tmpDir = '';
 
 	/**

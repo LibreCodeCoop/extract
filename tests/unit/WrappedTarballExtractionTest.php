@@ -24,7 +24,7 @@ use Psr\Log\LoggerInterface;
  * routed through the two-pass path.
  */
 final class WrappedTarballExtractionTest extends TestCase {
-	private ExtractionController $controller;
+	private ?ExtractionController $controller = null;
 	private string $tmpDir = '';
 
 	/**

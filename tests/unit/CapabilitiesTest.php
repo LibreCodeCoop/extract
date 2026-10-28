@@ -11,11 +11,13 @@ namespace OCA\Extract\Tests\unit;
 
 use OCA\Extract\Capabilities;
 use OCP\App\IAppManager;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Tests for the capabilities the app advertises to clients.
+ */
 final class CapabilitiesTest extends TestCase {
-	private IAppManager&MockObject $appManager;
+	private ?IAppManager $appManager = null;
 
 	/**
 	 * Set up the mocked app manager.
