@@ -37,10 +37,13 @@ updates:
           - minor
           - patch
     ignore:
-      # Vendored inside npm; no override or lockfile change can reach it.
+      # The range must cover the version Dependabot would try to move to, not
+      # just the vulnerable one: `ignore.versions` matches the *target* version,
+      # so "<6.29.1" would still attempt 6.29.1 and leave the job red. 6.29.1 is
+      # the earliest patched release and is unreachable here, so it is included.
       - dependency-name: undici
         versions:
-          - "<6.29.1"
+          - "<=6.29.1"
       # 6.6.1 is the newest published version, so no fix exists yet. Scoped to
       # this version range rather than the package, so a future patched release
       # is still picked up automatically.

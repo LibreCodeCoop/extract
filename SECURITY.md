@@ -20,7 +20,7 @@ not receive backports; please upgrade to the newest version before reporting.
 | Component | Supported |
 |-----------|-----------|
 | Nextcloud | 33, 34, 35 |
-| PHP | 8.1 or newer |
+| PHP | 8.1 – 8.x (`^8.1`; PHP 9 is not yet supported) |
 
 ## Reporting a vulnerability
 
