@@ -62,6 +62,11 @@ interface ExtractionResponse {
  *
  * @param node The node to inspect
  */
+// The helpers below are module-scoped function declarations. The project's
+// ESLint config (antfu/top-level-function) requires the `function` keyword, so
+// they cannot be arrow functions. skipcq silences DeepSource's JS-0067, which
+// assumes these are globals that could collide with other scripts.
+// skipcq: JS-0067
 function archiveMimeOf(node: INode): string | undefined {
 	const mime = node.mime
 	if (mime !== '' && mime !== 'application/octet-stream') {
@@ -75,6 +80,7 @@ function archiveMimeOf(node: INode): string | undefined {
  *
  * @param node The node to inspect
  */
+// skipcq: JS-0067
 function isSupportedArchive(node: INode): boolean {
 	const mime = archiveMimeOf(node)
 	return mime !== undefined && SUPPORTED_ARCHIVE_MIME_TYPES.includes(mime)
@@ -85,6 +91,7 @@ function isSupportedArchive(node: INode): boolean {
  *
  * @param node The node to inspect
  */
+// skipcq: JS-0067
 function isExternalStorage(node: INode): boolean {
 	return String(node.attributes?.['mount-type'] ?? '').startsWith('external')
 }
@@ -94,6 +101,7 @@ function isExternalStorage(node: INode): boolean {
  *
  * @param extracted The folder description returned by the server
  */
+// skipcq: JS-0067
 function toFolder(extracted: ExtractedFolder): Folder {
 	return new Folder({
 		id: extracted.fileId,
@@ -120,6 +128,7 @@ function toFolder(extracted: ExtractedFolder): Folder {
  *
  * @param response The parsed OCS response
  */
+// skipcq: JS-0067
 function readExtractedFolder(response: ExtractionResponse): ExtractedFolder | null {
 	const { code, desc, extracted } = response.ocs.data
 
@@ -137,6 +146,7 @@ function readExtractedFolder(response: ExtractionResponse): ExtractedFolder | nu
  * @param node The archive to extract
  * @param folder The folder the archive lives in
  */
+// skipcq: JS-0067
 function buildRequestBody(node: INode, folder: IFolder) {
 	return {
 		nameOfFile: node.basename,
@@ -151,6 +161,7 @@ function buildRequestBody(node: INode, folder: IFolder) {
  *
  * @param context The file action context
  */
+// skipcq: JS-0067
 function isEnabled(context: ActionContext): boolean {
 	if (context.nodes.length !== 1) {
 		return false
@@ -167,6 +178,7 @@ function isEnabled(context: ActionContext): boolean {
  *
  * @param context The file action context
  */
+// skipcq: JS-0067
 async function exec(context: ActionContextSingle): Promise<boolean | null> {
 	const [node] = context.nodes
 	if (node === undefined) {
@@ -208,6 +220,7 @@ export const extractAction: IFileAction = {
 /**
  * Register the "Extract here" file action.
  */
+// skipcq: JS-0067
 export function registerExtractAction(): void {
 	registerFileAction(extractAction)
 }
