@@ -83,21 +83,33 @@ final class WrappedTarballExtractionTest extends TestCase {
 		rmdir($path);
 	}
 
-	private function createPayload(): string {
-		$payload = $this->tmpDir . '/payload';
-		mkdir($payload, 0777, true);
-		file_put_contents($payload . '/hello.txt', 'hello world');
-		mkdir($payload . '/nested', 0777, true);
-		file_put_contents($payload . '/nested/inside.txt', 'nested content');
-
-		return $payload;
+	/**
+	 * Build a tar archive using PharData.
+	 *
+	 * PharData builds the fixture in-process, so the test does not shell out
+	 * to `tar` to create its own input.
+	 *
+	 * @param string $path Where to write the tar.
+	 * @param bool $gzip Whether to wrap the tar in gzip.
+	 * @return string The archive that was produced. PharData::compress()
+	 *                appends `.gz`, so this can differ from $path.
+	 */
+	private function createTar(string $path, bool $gzip): string {
+		$tar = new \PharData($path);
+		$tar->addFromString('hello.txt', 'hello world');
+		$tar->addFromString('nested/inside.txt', 'nested content');
+		if ($gzip === true) {
+			$tar->compress(\Phar::GZ);
+			unset($tar);
+			// compress() writes alongside the tar with a .gz suffix.
+			return $path . '.gz';
+		}
+		unset($tar);
+		return $path;
 	}
 
 	public function testAWrappedTarballIsUnpackedIntoTheDestination(): void {
-		$payload = $this->createPayload();
-		$archive = $this->tmpDir . '/data.tar.gz';
-		exec('tar czf ' . escapeshellarg($archive) . ' -C ' . escapeshellarg($payload) . ' . 2>/dev/null', $out, $return);
-		self::assertSame(0, $return, 'Could not build the fixture archive');
+		$archive = $this->createTar($this->tmpDir . '/data.tar', true);
 
 		$destination = $this->tmpDir . '/result';
 		$method = new \ReflectionMethod(ExtractionController::class, 'extractWrappedTarball');
@@ -110,9 +122,7 @@ final class WrappedTarballExtractionTest extends TestCase {
 	}
 
 	public function testTheScratchDirectoryIsRemovedAfterwards(): void {
-		$payload = $this->createPayload();
-		$archive = $this->tmpDir . '/data.tar.gz';
-		exec('tar czf ' . escapeshellarg($archive) . ' -C ' . escapeshellarg($payload) . ' . 2>/dev/null');
+		$archive = $this->createTar($this->tmpDir . '/data.tar', true);
 
 		$destination = $this->tmpDir . '/result';
 		$method = new \ReflectionMethod(ExtractionController::class, 'extractWrappedTarball');
@@ -144,9 +154,7 @@ final class WrappedTarballExtractionTest extends TestCase {
 	 * down the two-pass path.
 	 */
 	public function testAPlainTarIsExpandedInASinglePass(): void {
-		$payload = $this->createPayload();
-		$archive = $this->tmpDir . '/data.tar';
-		exec('tar cf ' . escapeshellarg($archive) . ' -C ' . escapeshellarg($payload) . ' . 2>/dev/null');
+		$archive = $this->createTar($this->tmpDir . '/data.tar', false);
 
 		$isWrapped = new \ReflectionMethod(ExtractionController::class, 'isWrappedTarball');
 		self::assertFalse($isWrapped->invoke(null, 'data.tar'));
