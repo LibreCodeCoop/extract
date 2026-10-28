@@ -25,7 +25,7 @@ use Psr\Log\LoggerInterface;
  */
 final class WrappedTarballExtractionTest extends TestCase {
 	private ExtractionController $controller;
-	private string $tmpDir;
+	private string $tmpDir = '';
 
 	/**
 	 * Prepare a controller wired to the real extraction service.

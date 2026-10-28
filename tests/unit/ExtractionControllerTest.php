@@ -17,6 +17,9 @@ use PHPUnit\Framework\TestCase;
  * extraction strategy the controller selects.
  */
 final class ExtractionControllerTest extends TestCase {
+	/**
+	 * Every archive MIME Nextcloud reports is mapped.
+	 */
 	public function testEverySupportedExtensionHasAMimeType(): void {
 		// The MIME types Nextcloud resolves for the extensions listed in the
 		// README (see resources/config/mimetypemapping.dist.json in the server).
@@ -39,17 +42,26 @@ final class ExtractionControllerTest extends TestCase {
 		}
 	}
 
+	/**
+	 * application/gzip uses the generic strategy.
+	 */
 	public function testGzipUsesTheGenericStrategy(): void {
 		// Nextcloud reports application/gzip for .gz/.tgz; the controller used
 		// to only know application/x-gzip, which made the action fail.
 		self::assertSame('other', ExtractionController::SUPPORTED_MIME_TYPES['application/gzip']);
 	}
 
+	/**
+	 * Zip and rar use their dedicated strategies.
+	 */
 	public function testZipAndRarUseTheirDedicatedStrategies(): void {
 		self::assertSame('zip', ExtractionController::SUPPORTED_MIME_TYPES['application/zip']);
 		self::assertSame('rar', ExtractionController::SUPPORTED_MIME_TYPES['application/x-rar-compressed']);
 	}
 
+	/**
+	 * Every mapped strategy is one the controller implements.
+	 */
 	public function testEveryStrategyIsKnown(): void {
 		foreach (ExtractionController::SUPPORTED_MIME_TYPES as $mime => $strategy) {
 			self::assertContains($strategy, ['zip', 'rar', 'other'], "$mime maps to unknown strategy $strategy");
@@ -81,6 +93,9 @@ final class ExtractionControllerTest extends TestCase {
 		}
 	}
 
+	/**
+	 * Plain archives are not treated as wrapped tarballs.
+	 */
 	public function testPlainArchivesAreNotWrappedTarballs(): void {
 		$method = new \ReflectionMethod(ExtractionController::class, 'isWrappedTarball');
 

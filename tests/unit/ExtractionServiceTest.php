@@ -20,8 +20,11 @@ final class ExtractionServiceTest extends TestCase {
 	private ExtractionService $service;
 	private IL10N&MockObject $l10n;
 	private LoggerInterface&MockObject $logger;
-	private string $tmpDir;
+	private string $tmpDir = '';
 
+	/**
+	 * Build the service under test and a scratch directory.
+	 */
 	protected function setUp(): void {
 		parent::setUp();
 
@@ -39,11 +42,17 @@ final class ExtractionServiceTest extends TestCase {
 		}
 	}
 
+	/**
+	 * Remove the scratch directory.
+	 */
 	protected function tearDown(): void {
 		$this->removeDirectory($this->tmpDir);
 		parent::tearDown();
 	}
 
+	/**
+	 * Recursively remove a directory, ignoring a missing one.
+	 */
 	private function removeDirectory(string $path): void {
 		if (is_dir($path) === false) {
 			return;
@@ -63,6 +72,9 @@ final class ExtractionServiceTest extends TestCase {
 		rmdir($path);
 	}
 
+	/**
+	 * Create a zip fixture with the given entries.
+	 */
 	private function createZip(string $path, array $entries): void {
 		$zip = new ZipArchive();
 		self::assertTrue($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE));
@@ -72,6 +84,9 @@ final class ExtractionServiceTest extends TestCase {
 		$zip->close();
 	}
 
+	/**
+	 * A zip is unpacked with its nested entries.
+	 */
 	public function testExtractZipExtractsAllEntries(): void {
 		$archive = $this->tmpDir . '/archive.zip';
 		$this->createZip($archive, [
@@ -90,6 +105,9 @@ final class ExtractionServiceTest extends TestCase {
 		self::assertSame('nested content', file_get_contents($destination . '/nested/inside.txt'));
 	}
 
+	/**
+	 * A file that is not a zip reports failure.
+	 */
 	public function testExtractZipRejectsANonZipFile(): void {
 		$archive = $this->tmpDir . '/not-an-archive.zip';
 		file_put_contents($archive, 'this is definitely not a zip archive');
@@ -100,6 +118,9 @@ final class ExtractionServiceTest extends TestCase {
 		self::assertSame('Cannot open Zip file', $response['desc']);
 	}
 
+	/**
+	 * A missing archive reports failure.
+	 */
 	public function testExtractZipReportsWhenTheArchiveIsMissing(): void {
 		$response = $this->service->extractZip($this->tmpDir . '/does-not-exist.zip', $this->tmpDir . '/out');
 
@@ -107,6 +128,9 @@ final class ExtractionServiceTest extends TestCase {
 		self::assertArrayHasKey('desc', $response);
 	}
 
+	/**
+	 * A corrupt 7z archive reports failure.
+	 */
 	public function testExtractOtherReportsFailureWhenTheArchiveCannotBeRead(): void {
 		if (trim((string)shell_exec('command -v 7za 2>/dev/null')) === '') {
 			self::markTestSkipped('7za is not installed, the failure branch cannot be exercised');
@@ -144,6 +168,9 @@ final class ExtractionServiceTest extends TestCase {
 		self::assertSame("hello world\n", file_get_contents($destination . '/hello.txt'));
 	}
 
+	/**
+	 * A rar archive without rar support reports failure.
+	 */
 	public function testExtractRarReportsFailureWhenNoRarSupportIsAvailable(): void {
 		if (extension_loaded('rar') === true || trim((string)shell_exec('command -v unrar 2>/dev/null')) !== '') {
 			self::markTestSkipped('rar support is installed, the failure branch cannot be exercised');

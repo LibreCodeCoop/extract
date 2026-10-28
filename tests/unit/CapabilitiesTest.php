@@ -17,11 +17,17 @@ use PHPUnit\Framework\TestCase;
 final class CapabilitiesTest extends TestCase {
 	private IAppManager&MockObject $appManager;
 
+	/**
+	 * Set up the mocked app manager.
+	 */
 	protected function setUp(): void {
 		parent::setUp();
 		$this->appManager = $this->createMock(IAppManager::class);
 	}
 
+	/**
+	 * The reported version comes from the app manager.
+	 */
 	public function testGetCapabilitiesExposesTheAppVersion(): void {
 		$this->appManager->expects(self::once())
 			->method('getAppVersion')
@@ -34,6 +40,9 @@ final class CapabilitiesTest extends TestCase {
 		self::assertSame('3.1.0', $capabilities['extract']['version']);
 	}
 
+	/**
+	 * Every advertised feature is listed.
+	 */
 	public function testGetCapabilitiesListsEverySupportedArchiveFeature(): void {
 		$this->appManager->method('getAppVersion')->willReturn('3.1.0');
 
@@ -45,6 +54,9 @@ final class CapabilitiesTest extends TestCase {
 		self::assertContains('extract-7z', $capabilities['extract']['features']);
 	}
 
+	/**
+	 * The config key is always present as an array.
+	 */
 	public function testGetCapabilitiesReturnsAConfigArray(): void {
 		$this->appManager->method('getAppVersion')->willReturn('3.1.0');
 
