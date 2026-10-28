@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: 2025 LibreCode coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Dependabot configuration.
+#
+# The `ignore` entries below cover two advisories that cannot be fixed from this
+# repository. Dependabot's update job fails when it cannot produce a security
+# update, so leaving them enabled turns every run red:
+#
+#   undici 6.29.0  - reached only through semantic-release -> @semantic-release/npm
+#                    -> npm -> node-gyp. npm vendors this dependency inside its own
+#                    tarball (inBundle: true), so neither an `overrides` entry nor a
+#                    lockfile edit reaches it; `npm ci` restores 6.29.0. npm 11.21.1
+#                    and 12.2.1 both still bundle 6.29.0, so there is no release to
+#                    move to. Dependabot reports: "Security update not possible for
+#                    undici ... latest possible version is 6.29.0".
+#
+#   elliptic 6.6.1 - dev-only, via @nextcloud/vite-config -> node-stdlib-browser.
+#                    6.6.1 is the latest published version, so no fix exists.
+#                    Dependabot reports: "Security update not found for elliptic ...
+#                    dependency is up to date but still vulnerable".
+#
+# Revisit both when npm ships a patched undici, or when a patched elliptic is
+# published. The corresponding Dependabot alerts stay open as a reminder.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm_and_yarn:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Vendored inside npm; no override or lockfile change can reach it.
+      - dependency-name: undici
+        versions:
+          - "<6.29.1"
+      # 6.6.1 is the newest published version, so no fix exists yet. Scoped to
+      # this version range rather than the package, so a future patched release
+      # is still picked up automatically.
+      - dependency-name: elliptic
+        versions:
+          - "<=6.6.1"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
