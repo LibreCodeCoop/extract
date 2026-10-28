@@ -32,10 +32,10 @@ jobs:
 
       - name: Get php version
         id: php_versions
-        uses: icewind1991/nextcloud-version-matrix@58becf3b4bb6dc6cef677b15e2fd8e7d48c0908f # v1.3.1
+        uses: icewind1991/nextcloud-version-matrix@cd0211ffcef1065e2020cd579e4843b8746e7a58 # v1.3.3
 
       - name: Set up php
-        uses: shivammathur/setup-php@ec406be512d7077f68eed36e63f4d91bc006edc4 # v2.35.4
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
         with:
           php-version: ${{ steps.php_versions.outputs.php-available }}
           extensions: xml
@@ -46,7 +46,7 @@ jobs:
 
       - name: Check Typescript OpenApi types
         id: check_typescript_openapi
-        uses: andstor/file-existence-action@076e0072799f4942c8bc574a82233e1e4d13e9d6 # v3.0.0
+        uses: andstor/file-existence-action@558493d6c74bf472d87c84eab196434afc2fa029 # v3.1.0
         with:
           files: "src/types/openapi/openapi*.ts"
 
