@@ -194,11 +194,14 @@ make lint               # run the PHP and frontend linters
 make dist               # build the source package and the app-store archives
 ```
 
-`make appstore` stages only the runtime files, then writes both
-`build/artifacts/extract.tar.gz` and `build/artifacts/extract.zip`. It packages
-whatever is in `js/`, so run `make build` first on a fresh checkout (or use
-`make dist`, which builds the source package too). Both archives are attached to
-every GitHub release.
+`make appstore` stages only the runtime files, then writes
+`build/artifacts/extract.tar.gz` and, when `zip` is installed,
+`build/artifacts/extract.zip`. Without `zip` it skips the zip with a warning;
+the release workflow installs `zip` so both archives are always attached.
+
+It packages whatever is already in `js/` and `css/`, and it does not build the
+frontend itself, so run `make build` first on a fresh checkout. `make dist` is
+not a substitute: it only runs the source and app-store targets.
 
 ## 🧪 Testing
 

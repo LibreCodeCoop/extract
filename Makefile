@@ -59,7 +59,8 @@ endif
 	fi
 	@echo "package.json version updated to $(VERSION)"
 	@if [ -f package-lock.json ]; then \
-	node -e "const fs=require('fs'); const l=JSON.parse(fs.readFileSync('package-lock.json','utf8')); l.version='$(VERSION)'; if (l.packages && l.packages['']) { l.packages[''].version='$(VERSION)'; } fs.writeFileSync('package-lock.json', JSON.stringify(l, null, 2)+'\n');"; \
+	node -e "const fs=require('fs'); const l=JSON.parse(fs.readFileSync('package-lock.json','utf8')); l.version='$(VERSION)'; if (l.packages && l.packages['']) { l.packages[''].version='$(VERSION)'; } fs.writeFileSync('package-lock.json', JSON.stringify(l, null, 2)+'\n');" || \
+	{ echo "ERROR: Failed to update package-lock.json"; exit 1; }; \
 	echo "package-lock.json version updated to $(VERSION)"; \
 	fi
 
