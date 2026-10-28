@@ -56,12 +56,17 @@ final class ExtractionService {
 
 		if (!extension_loaded('rar')) {
 			exec('unrar x ' . escapeshellarg($file) . ' -R ' . escapeshellarg($extractTo) . '/ -o+', $output, $return);
-			if (sizeof($output) <= 4) {
+			if ($return !== 0) {
 				$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Oops something went wrong. Check that you have rar extension or unrar installed')]);
+				$this->logger->error('unrar failed with exit code ' . $return . '. Output: ' . print_r($output, true));
 				return $response;
 			}
 		} else {
 			$rar_file = rar_open($file);
+			if ($rar_file === false) {
+				$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Cannot open Rar file')]);
+				return $response;
+			}
 			$list = rar_list($rar_file);
 			foreach ($list as $archive_file) {
 				$entry = rar_entry_get($rar_file, $archive_file->getName());
@@ -84,9 +89,13 @@ final class ExtractionService {
 
 		exec('7za -y x ' . escapeshellarg($file) . ' -o' . escapeshellarg($extractTo), $output, $return);
 
-		if (sizeof($output) <= 5) {
+		// 7za reports failure through its exit code: 0 on success, 2 on a fatal
+		// error such as a corrupt archive or a missing file, 127 when the
+		// binary itself is absent. The output line count is not a usable signal
+		// because failures print more lines than successes.
+		if ($return !== 0) {
 			$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);
-			$this->logger->error('Is 7-Zip installed? Output: ' . print_r($output, true));
+			$this->logger->error('7za failed with exit code ' . $return . '. Is 7-Zip installed? Output: ' . print_r($output, true));
 			return $response;
 		}
 		$response = array_merge($response, ['code' => 1]);

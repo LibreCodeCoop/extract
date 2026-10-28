@@ -29,6 +29,7 @@ path = [
     "package-lock.json",
     "package.json",
     "psalm.xml",
+    "tsconfig.json",
     "src/types/openapi/openapi.ts",
     "tests/psalm-baseline.xml",
     "vendor-bin/**/composer.json",
@@ -40,7 +41,7 @@ SPDX-FileCopyrightText = "2025 LibreCode coop and contributors"
 SPDX-License-Identifier = "AGPL-3.0-or-later"
 
 [[annotations]]
-path = [".github/workflows/**", ".releaserc", ".releaserc.json"]
+path = [".github/workflows/**", ".releaserc", ".releaserc.json", "release.config.cjs", "tests/**"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2025 LibreCode coop and contributors"
 SPDX-License-Identifier = "AGPL-3.0-or-later"
