@@ -54,6 +54,11 @@ module.exports = {
 			{
 				// Keep appinfo/info.xml and package.json in step with the tag so
 				// the packaged archive carries the released version.
+				//
+				// skipcq: JS-0038 -- ${nextRelease.version} is a semantic-release
+				// placeholder that the plugin substitutes, not a JS template literal.
+				// Backticks would evaluate it here and throw, because nextRelease
+				// does not exist in this file.
 				prepareCmd: 'make bump-version VERSION=${nextRelease.version}',
 			},
 		],
@@ -61,6 +66,9 @@ module.exports = {
 			'@semantic-release/git',
 			{
 				assets: ['CHANGELOG.md', 'appinfo/info.xml', 'package.json', 'package-lock.json'],
+				// skipcq: JS-0038 -- these are semantic-release placeholders, and
+				// this is the exact string the @semantic-release/git README
+				// documents. Backticks would throw at load time.
 				message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}',
 			},
 		],
