@@ -129,14 +129,26 @@ final class ExtractionController extends AEnvironmentAwareController {
 	/**
 	 * Whether a result-folder name is usable.
 	 *
-	 * A name such as `.tar.gz` strips down to an empty string, which would make
-	 * the destination the containing directory and unpack the archive into the
-	 * user's own folder.
+	 * The name must be a plain single path component. Stripping the suffixes
+	 * from a crafted name can leave a path component behind:
+	 *
+	 *   `.tar.gz`   -> ''    (destination would be the containing directory)
+	 *   `..tar.gz`  -> '.'   (destination would be the containing directory)
+	 *   `...tar.gz` -> '..'  (destination would be the parent directory)
+	 *
+	 * Rejecting anything that is empty, `.` or `..` keeps the destination inside
+	 * the folder the archive lives in.
 	 *
 	 * @param string $folderName The candidate folder name.
 	 */
 	private static function isUsableFolderName(string $folderName): bool {
-		return trim($folderName) !== '';
+		$trimmed = trim($folderName);
+		if ($trimmed === '' || $trimmed === '.' || $trimmed === '..') {
+			return false;
+		}
+
+		// A separator would also escape the containing folder.
+		return str_contains($trimmed, '/') === false && str_contains($trimmed, '\\') === false;
 	}
 
 	/**

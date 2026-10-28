@@ -128,15 +128,15 @@ final class ExtractionControllerTest extends TestCase {
 	}
 
 	/**
-	 * A name that reduces to nothing must be rejected: the destination would
-	 * otherwise be the containing directory and the archive would unpack into the
-	 * user's own folder.
+	 * A name that reduces to a path component must be rejected: the destination
+	 * would otherwise be the containing or the parent directory, unpacking the
+	 * archive outside the folder it lives in.
 	 */
 	public function testDegenerateArchiveNamesAreRejected(): void {
 		$name = new \ReflectionMethod(ExtractionController::class, 'resultFolderName');
 		$usable = new \ReflectionMethod(ExtractionController::class, 'isUsableFolderName');
 
-		foreach (['.tar.gz', '.tar', '.tbz2', '.gz'] as $fileName) {
+		foreach (['.tar.gz', '.tar', '.tbz2', '.gz', '..tar.gz', '...tar.gz', '..', '.'] as $fileName) {
 			self::assertFalse(
 				$usable->invoke(null, $name->invoke(null, $fileName)),
 				"$fileName must not be accepted as a result folder",
