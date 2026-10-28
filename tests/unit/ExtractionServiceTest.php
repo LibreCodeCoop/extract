@@ -11,6 +11,7 @@ namespace OCA\Extract\Tests\unit;
 
 use OCA\Extract\Service\ExtractionService;
 use OCP\IL10N;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use ZipArchive;
@@ -23,7 +24,9 @@ use ZipArchive;
  */
 final class ExtractionServiceTest extends TestCase {
 	private ?ExtractionService $service = null;
+	/** @var IL10N&MockObject */
 	private ?IL10N $l10n = null;
+	/** @var LoggerInterface&MockObject */
 	private ?LoggerInterface $logger = null;
 	private string $tmpDir = '';
 
