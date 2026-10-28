@@ -34,7 +34,7 @@ final class ExtractionServiceTest extends TestCase {
 		$this->service = new ExtractionService($this->l10n, $this->logger);
 
 		$this->tmpDir = sys_get_temp_dir() . '/extract-test-' . bin2hex(random_bytes(6));
-		if (!mkdir($this->tmpDir, 0777, true) && !is_dir($this->tmpDir)) {
+		if (mkdir($this->tmpDir, 0777, true) === false && is_dir($this->tmpDir) === false) {
 			self::fail('Could not create the temporary test directory');
 		}
 	}
@@ -45,7 +45,7 @@ final class ExtractionServiceTest extends TestCase {
 	}
 
 	private function removeDirectory(string $path): void {
-		if (!is_dir($path)) {
+		if (is_dir($path) === false) {
 			return;
 		}
 		$iterator = new \RecursiveIteratorIterator(
@@ -54,7 +54,11 @@ final class ExtractionServiceTest extends TestCase {
 		);
 		foreach ($iterator as $item) {
 			/** @var \SplFileInfo $item */
-			$item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+			if ($item->isDir() === true) {
+				rmdir($item->getPathname());
+			} else {
+				unlink($item->getPathname());
+			}
 		}
 		rmdir($path);
 	}
@@ -140,7 +144,7 @@ final class ExtractionServiceTest extends TestCase {
 	}
 
 	public function testExtractRarReportsFailureWhenNoRarSupportIsAvailable(): void {
-		if (extension_loaded('rar') || trim((string)shell_exec('command -v unrar 2>/dev/null')) !== '') {
+		if (extension_loaded('rar') === true || trim((string)shell_exec('command -v unrar 2>/dev/null')) !== '') {
 			self::markTestSkipped('rar support is installed, the failure branch cannot be exercised');
 		}
 

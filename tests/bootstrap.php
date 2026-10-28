@@ -10,7 +10,7 @@ declare(strict_types=1);
 // Composer autoloader. When the suite runs inside a full Nextcloud checkout,
 // the server bootstrap is loaded first so the OC_* helpers exist.
 $serverBootstrap = __DIR__ . '/../../../tests/bootstrap.php';
-if (file_exists($serverBootstrap)) {
+if (file_exists($serverBootstrap) === true) {
 	require_once $serverBootstrap;
 }
 

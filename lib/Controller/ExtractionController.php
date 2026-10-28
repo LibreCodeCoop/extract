@@ -96,11 +96,11 @@ final class ExtractionController extends AEnvironmentAwareController {
 	 */
 	private static function isCompressedTarball(string $fileName): bool {
 		$lower = strtolower($fileName);
-		if (str_ends_with($lower, '.tar')) {
+		if (str_ends_with($lower, '.tar') === true) {
 			return true;
 		}
 		foreach (self::COMPRESSED_TARBALL_EXTENSIONS as $extension) {
-			if (str_ends_with($lower, '.' . $extension)) {
+			if (str_ends_with($lower, '.' . $extension) === true) {
 				return true;
 			}
 		}
@@ -148,7 +148,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 	 * @param string $directory The directory to inspect.
 	 */
 	private function findSingleFile(string $directory): ?string {
-		if (!is_dir($directory)) {
+		if (is_dir($directory) === false) {
 			return null;
 		}
 
@@ -158,7 +158,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 		);
 		foreach ($iterator as $entry) {
 			/** @var \SplFileInfo $entry */
-			if ($entry->isFile()) {
+			if ($entry->isFile() === true) {
 				$files[] = $entry->getPathname();
 			}
 		}
@@ -172,7 +172,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 	 * @param string $directory The directory to remove.
 	 */
 	private function removeDirectory(string $directory): void {
-		if (!is_dir($directory)) {
+		if (is_dir($directory) === false) {
 			return;
 		}
 
@@ -182,7 +182,11 @@ final class ExtractionController extends AEnvironmentAwareController {
 		);
 		foreach ($iterator as $entry) {
 			/** @var \SplFileInfo $entry */
-			$entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
+			if ($entry->isDir() === true) {
+				rmdir($entry->getPathname());
+			} else {
+				unlink($entry->getPathname());
+			}
 		}
 		rmdir($directory);
 	}
@@ -298,7 +302,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 				$response = $this->extractionService->extractRar($file, $extractTo);
 				break;
 			default:
-				if (self::isCompressedTarball($nameOfFile)) {
+				if (self::isCompressedTarball($nameOfFile) === true) {
 					$response = $this->extractCompressedTarball($file, $extractTo);
 				} else {
 					$response = $this->extractionService->extractOther($file, $extractTo);
