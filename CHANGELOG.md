@@ -1,3 +1,10 @@
+## [3.1.1](https://github.com/ashcoft/extract/compare/v3.1.0...v3.1.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **ci:** widen the undici ignore to the patch target and correct the PHP range ([e999278](https://github.com/ashcoft/extract/commit/e99927825f1d97b66034e0f6a4812e8b9a8e9c33))
+
 <!--
  - SPDX-FileCopyrightText: 2025 LibreCode coop and contributors
  - SPDX-License-Identifier: AGPL-3.0-or-later
