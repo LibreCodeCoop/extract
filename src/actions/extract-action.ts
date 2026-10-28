@@ -7,6 +7,7 @@ import type { ActionContext, ActionContextSingle, IFileAction, INode } from '@ne
 
 import ArchiveArrowUpSvg from '@mdi/svg/svg/archive-arrow-up.svg?raw'
 import axios from '@nextcloud/axios'
+import { showError } from '@nextcloud/dialogs'
 import { emit } from '@nextcloud/event-bus'
 import { Folder, Permission, registerFileAction } from '@nextcloud/files'
 import { translate as t } from '@nextcloud/l10n'
@@ -121,8 +122,11 @@ function toFolder(extracted: ExtractedFolder): Folder {
 /**
  * Extract the selected archive and add the resulting folder to the file list.
  *
- * Throws with the server's message when the extraction failed, so the Files app
- * shows the reason to the user instead of failing silently.
+ * A refusal the server describes (encryption enabled, a missing file, an
+ * unsupported type) is shown with showError, because the Files app only renders
+ * a generic "{action}: failed" message when exec throws. Transport errors
+ * (a rejected request, or a 500 from a failed extraction) propagate to the
+ * Files app's own error handling.
  *
  * @param context The file action context
  */
@@ -144,9 +148,12 @@ async function exec(context: ActionContextSingle): Promise<boolean | null> {
 	const { code, desc, extracted } = response.ocs.data
 
 	if (code === 0 || extracted === undefined) {
-		// The server explained why it refused (encryption, a missing file, an
-		// unsupported type). Surface that instead of failing silently.
-		throw new Error(desc ?? t('extract', 'Extraction failed'))
+		// The server refused and explained why (encryption enabled, a missing file,
+		// an unsupported type). The Files app renders only a generic
+		// "{action}: failed" message when exec throws, so show the reason here.
+		const reason = desc ?? t('extract', 'Extraction failed')
+		showError(reason)
+		throw new Error(reason)
 	}
 
 	const folder = toFolder(extracted)

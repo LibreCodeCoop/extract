@@ -57,14 +57,16 @@ final class ExtractionControllerTest extends TestCase {
 	}
 
 	/**
-	 * Compressed tarballs must be recognised by every spelling users and
-	 * Nextcloud produce, otherwise the inner tar is left behind as a file.
+	 * Only tarballs with a real compression wrapper take the two-pass path.
+	 *
+	 * A plain `.tar` must not: 7za expands it in a single pass, so treating it as
+	 * wrapped would make the controller look for a second archive inside the
+	 * extracted payload.
 	 */
-	public function testCompressedTarballsAreRecognised(): void {
-		$method = new \ReflectionMethod(ExtractionController::class, 'isCompressedTarball');
+	public function testWrappedTarballsAreRecognised(): void {
+		$method = new \ReflectionMethod(ExtractionController::class, 'isWrappedTarball');
 
-		$tarballs = [
-			'archive.tar',
+		$wrapped = [
 			'archive.tar.gz',
 			'archive.tar.bz2',
 			'archive.tar.xz',
@@ -74,16 +76,39 @@ final class ExtractionControllerTest extends TestCase {
 			'archive.txz',
 			'ARCHIVE.TGZ',
 		];
-		foreach ($tarballs as $name) {
-			self::assertTrue($method->invoke(null, $name), "$name should be treated as a compressed tarball");
+		foreach ($wrapped as $name) {
+			self::assertTrue($method->invoke(null, $name), "$name should take the two-pass path");
 		}
 	}
 
-	public function testPlainArchivesAreNotTreatedAsCompressedTarballs(): void {
-		$method = new \ReflectionMethod(ExtractionController::class, 'isCompressedTarball');
+	public function testPlainArchivesAreNotWrappedTarballs(): void {
+		$method = new \ReflectionMethod(ExtractionController::class, 'isWrappedTarball');
 
-		foreach (['archive.zip', 'archive.7z', 'archive.rar', 'archive.deb', 'archive.gz'] as $name) {
-			self::assertFalse($method->invoke(null, $name), "$name should not be treated as a compressed tarball");
+		$plain = ['archive.tar', 'archive.zip', 'archive.7z', 'archive.rar', 'archive.deb', 'archive.gz'];
+		foreach ($plain as $name) {
+			self::assertFalse($method->invoke(null, $name), "$name should take the single-pass path");
+		}
+	}
+
+	/**
+	 * Compressed tarballs lose both suffixes so the result folder matches the
+	 * one a plain archive of the same base name produces.
+	 */
+	public function testResultFolderNameDropsBothSuffixes(): void {
+		$method = new \ReflectionMethod(ExtractionController::class, 'resultFolderName');
+
+		$expected = [
+			'archive.tar.gz' => 'archive',
+			'archive.tgz' => 'archive',
+			'archive.tar.bz2' => 'archive',
+			'archive.tbz2' => 'archive',
+			'archive.tar' => 'archive',
+			'my.data.tar.gz' => 'my.data',
+			'archive.zip' => 'archive',
+			'archive.7z' => 'archive',
+		];
+		foreach ($expected as $name => $folder) {
+			self::assertSame($folder, $method->invoke(null, $name), "wrong result folder for $name");
 		}
 	}
 

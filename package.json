@@ -33,6 +33,7 @@
   "dependencies": {
     "@mdi/svg": "^7.4.47",
     "@nextcloud/axios": "^2.6.0",
+    "@nextcloud/dialogs": "^8.0.0",
     "@nextcloud/event-bus": "^3.3.1",
     "@nextcloud/files": "^4.1.0",
     "@nextcloud/l10n": "^3.4.1",

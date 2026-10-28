@@ -124,8 +124,9 @@ final class ExtractionServiceTest extends TestCase {
 	/**
 	 * A successful extraction must report code 1 and unpack the payload.
 	 *
-	 * The archive is a committed fixture, so the test does not depend on the
-	 * locally installed 7-Zip build.
+	 * The archive is a committed fixture, so no archive has to be built on the
+	 * host. 7za is still required to perform the extraction, and the test is
+	 * skipped when it is absent.
 	 */
 	public function testExtractOtherExtractsAValidArchive(): void {
 		if (trim((string)shell_exec('command -v 7za 2>/dev/null')) === '') {

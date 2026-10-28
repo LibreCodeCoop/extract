@@ -73,11 +73,13 @@ brew install p7zip
 
 1. Download the latest `extract.tar.gz` (or `extract.zip`) from the
    [releases page](https://github.com/ashcoft/extract/releases).
-2. Extract it into your Nextcloud `apps` directory:
+2. Extract it into your Nextcloud `apps` directory, using the command that
+   matches the archive you downloaded:
    ```bash
-   # For extract.tar.gz:
+   # If you downloaded extract.tar.gz:
    tar -xzf extract.tar.gz -C /path/to/nextcloud/apps
-   # For extract.zip:
+
+   # If you downloaded extract.zip:
    unzip extract.zip -d /path/to/nextcloud/apps
 
    chown -R www-data:www-data /path/to/nextcloud/apps/extract
@@ -257,8 +259,8 @@ The archive tool could not unpack the file. Common causes:
   target folder.
 - **Insufficient space** on the volume holding the archive.
 
-The Nextcloud log entry for the failure records the tool's exit code and output,
-which distinguishes these cases.
+For a failed `7za` or `unrar` run the Nextcloud log records the exit code and the
+tool output. Zip extraction and a missing tool are not logged with that detail.
 
 ### "Encryption is not supported yet"
 
