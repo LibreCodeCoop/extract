@@ -7,7 +7,6 @@ import type { ActionContext, ActionContextSingle, IFileAction, IFolder, INode } 
 
 import ArchiveArrowUpSvg from '@mdi/svg/svg/archive-arrow-up.svg?raw'
 import axios from '@nextcloud/axios'
-import { showError } from '@nextcloud/dialogs'
 import { emit } from '@nextcloud/event-bus'
 import { Folder, Permission, registerFileAction } from '@nextcloud/files'
 import { translate as t } from '@nextcloud/l10n'
@@ -115,7 +114,7 @@ function toFolder(extracted: ExtractedFolder): Folder {
  * Read the extracted folder out of an OCS response.
  *
  * A refusal the server describes (encryption enabled, a missing file, an
- * unsupported type) is reported with showError and signalled by returning null.
+ * unsupported type) is reported with OCP.Toast and signalled by returning null.
  * Throwing is deliberately avoided: the Files app would then also show its own
  * generic "{action}: failed" notification, so the user would see two messages.
  *
@@ -125,7 +124,7 @@ function readExtractedFolder(response: ExtractionResponse): ExtractedFolder | nu
 	const { code, desc, extracted } = response.ocs.data
 
 	if (code === 0 || extracted === undefined) {
-		showError(desc ?? t('extract', 'Extraction failed'))
+		window.OCP.Toast.error(desc ?? t('extract', 'Extraction failed'))
 		return null
 	}
 
