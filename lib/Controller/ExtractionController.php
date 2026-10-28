@@ -127,6 +127,19 @@ final class ExtractionController extends AEnvironmentAwareController {
 	}
 
 	/**
+	 * Whether a result-folder name is usable.
+	 *
+	 * A name such as `.tar.gz` strips down to an empty string, which would make
+	 * the destination the containing directory and unpack the archive into the
+	 * user's own folder.
+	 *
+	 * @param string $folderName The candidate folder name.
+	 */
+	private static function isUsableFolderName(string $folderName): bool {
+		return trim($folderName) !== '';
+	}
+
+	/**
 	 * Extract a tar that is wrapped in a compression layer.
 	 *
 	 * The wrapper is unwrapped into a request-owned scratch directory first,
@@ -273,6 +286,13 @@ final class ExtractionController extends AEnvironmentAwareController {
 
 		$type = self::SUPPORTED_MIME_TYPES[$mime];
 
+		// Reject a name that reduces to nothing (for example `.tar.gz`) before any
+		// work: the destination would otherwise be the containing directory.
+		$resultFolder = self::resultFolderName($nameOfFile);
+		if (self::isUsableFolderName($resultFolder) === false) {
+			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Unsupported archive type')]);
+		}
+
 		if ($this->encryptionManager->isEnabled()) {
 			$response = [];
 			$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Encryption is not supported yet')]);
@@ -287,7 +307,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 		// Folder the result is published under: both suffixes are dropped for a
 		// compressed tarball, so archive.tar.gz and archive.tar both become
 		// archive. For every other format this is the name without extension.
-		$fileName = self::resultFolderName($nameOfFile);
+		$fileName = $resultFolder;
 		$extractTo = $dir . '/' . $fileName;
 
 		// if the file is an external storage

@@ -33,6 +33,11 @@ final class WrappedTarballExtractionTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
+		// Assign the working directory before any skip: PHPUnit still runs
+		// tearDown() after a skip, and tearDown() reads this property.
+		$this->tmpDir = sys_get_temp_dir() . '/extract-wrapped-' . bin2hex(random_bytes(6));
+		mkdir($this->tmpDir, 0777, true);
+
 		if (trim((string)shell_exec('command -v 7za 2>/dev/null')) === '') {
 			self::markTestSkipped('7za is not installed');
 		}
@@ -52,9 +57,6 @@ final class WrappedTarballExtractionTest extends TestCase {
 		$this->setProperty('extractionService', new ExtractionService($l10n, $this->createMock(LoggerInterface::class)));
 		$this->setProperty('logger', $this->createMock(LoggerInterface::class));
 		$this->setProperty('l', $l10n);
-
-		$this->tmpDir = sys_get_temp_dir() . '/extract-wrapped-' . bin2hex(random_bytes(6));
-		mkdir($this->tmpDir, 0777, true);
 	}
 
 	/**

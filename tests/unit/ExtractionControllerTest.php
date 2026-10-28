@@ -113,6 +113,23 @@ final class ExtractionControllerTest extends TestCase {
 	}
 
 	/**
+	 * A name that reduces to nothing must be rejected: the destination would
+	 * otherwise be the containing directory and the archive would unpack into the
+	 * user's own folder.
+	 */
+	public function testDegenerateArchiveNamesAreRejected(): void {
+		$name = new \ReflectionMethod(ExtractionController::class, 'resultFolderName');
+		$usable = new \ReflectionMethod(ExtractionController::class, 'isUsableFolderName');
+
+		foreach (['.tar.gz', '.tar', '.tbz2', '.gz'] as $fileName) {
+			self::assertFalse(
+				$usable->invoke(null, $name->invoke(null, $fileName)),
+				"$fileName must not be accepted as a result folder",
+			);
+		}
+	}
+
+	/**
 	 * The frontend gates the action on its own copy of the archive MIME list, so
 	 * the two lists must not drift apart.
 	 */
