@@ -81,6 +81,25 @@ module.exports = {
 				// draft until they exist and a release never goes public empty.
 				assets: null,
 				draftRelease: true,
+
+				// Do not comment on, or label, the issues and pull requests
+				// "resolved" by a release.
+				//
+				// The success step resolves every released commit to a PR by number,
+				// and fails the whole release with a 404 when one cannot be found.
+				// This repository merged LibreCodeCoop/extract's history, whose
+				// commits reference pull requests that exist only upstream (for
+				// example "Merge pull request #165 from
+				// LibreCodeCoop/fix/manage-npm-audit-through-librcode-catalog").
+				// Those numbers do not resolve here, so the lookup 404s and the
+				// release fails after the tag is created, leaving the release without
+				// its archives.
+				//
+				// Nothing is lost: this app is not published to npm and has no issue
+				// or PR subscribers relying on release comments. Use the condition
+				// form rather than `false`, which is deprecated.
+				successCommentCondition: false,
+				releasedLabels: false,
 			},
 		],
 	],
