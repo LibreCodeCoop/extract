@@ -1,3 +1,11 @@
+## [3.1.2](https://github.com/ashcoft/extract/compare/v3.1.1...v3.1.2) (2026-10-29)
+
+
+### Bug Fixes
+
+* **ci:** adopt secured LibreCode npm audit workflow ([2c9e0ea](https://github.com/ashcoft/extract/commit/2c9e0eac5a181cf26c3c87db47f23d8660833abb))
+* **ci:** exclude EOL Nextcloud branches from npm audit ([62cd386](https://github.com/ashcoft/extract/commit/62cd3865d5c75cbecfe97a4640294e45c2578a07))
+
 ## [3.1.1](https://github.com/ashcoft/extract/compare/v3.1.0...v3.1.1) (2026-10-28)
 
 
