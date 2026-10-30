@@ -1,3 +1,10 @@
+## [3.1.5](https://github.com/ashcoft/extract/compare/v3.1.4...v3.1.5) (2026-10-30)
+
+
+### Bug Fixes
+
+* **extraction:** import the result on object storage and encrypted storage ([4048efb](https://github.com/ashcoft/extract/commit/4048efb5e2fdcd6345d0ec21f412978749b0869b))
+
 ## [3.1.4](https://github.com/ashcoft/extract/compare/v3.1.3...v3.1.4) (2026-10-30)
 
 
