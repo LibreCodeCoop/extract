@@ -1,3 +1,10 @@
+## [3.1.3](https://github.com/ashcoft/extract/compare/v3.1.2...v3.1.3) (2026-10-30)
+
+
+### Bug Fixes
+
+* **release:** stop the release failing on upstream pull request numbers ([3876977](https://github.com/ashcoft/extract/commit/387697716cf266c7475042f324f727f5592aca17)), closes [#165](https://github.com/ashcoft/extract/issues/165) [LibreCodeCoop/fix/manage-npm-audit-throu#librcode-catalog](https://github.com/LibreCodeCoop/fix/manage-npm-audit-throu/issues/librcode-catalog) [#165](https://github.com/ashcoft/extract/issues/165)
+
 ## [3.1.2](https://github.com/ashcoft/extract/compare/v3.1.1...v3.1.2) (2026-10-29)
 
 
