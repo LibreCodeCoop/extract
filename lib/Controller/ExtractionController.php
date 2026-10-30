@@ -14,7 +14,6 @@ use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\ApiRoute;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\DataResponse;
-use OCP\Encryption\IManager;
 use OCP\Files\Folder;
 use OCP\Files\IFilenameValidator;
 
@@ -74,7 +73,6 @@ final class ExtractionController extends AEnvironmentAwareController {
 		private IRootFolder $rootFolder,
 		private IL10N $l,
 		private LoggerInterface $logger,
-		private IManager $encryptionManager,
 		private string $userId,
 		private IURLGenerator $urlGenerator,
 		private IFilenameValidator $filenameValidator,
@@ -305,11 +303,6 @@ final class ExtractionController extends AEnvironmentAwareController {
 			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Unsupported archive type')]);
 		}
 
-		if ($this->encryptionManager->isEnabled()) {
-			$response = [];
-			$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Encryption is not supported yet')]);
-			return new DataResponse($response);
-		}
 		$file = $this->getFile($directory, $nameOfFile);
 		if ($file === false) {
 			$response = ['code' => 0, 'desc' => $this->l->t('File not found')];

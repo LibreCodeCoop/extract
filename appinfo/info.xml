@@ -25,7 +25,8 @@
     * **AND**
     * p7zip (sudo apt-get install p7zip p7zip-full)
 
-*  **Note :** Encrypted files are not supported yet
+*  **Note :** Password-protected archives are not supported yet. Files stored
+   with Nextcloud's server-side encryption are supported.
 ]]></description>
 
     <version>3.1.2</version>

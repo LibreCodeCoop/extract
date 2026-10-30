@@ -142,9 +142,9 @@ for archives whose MIME type the app can extract.
 | 7z | `.7z` | `7za` |
 | Deb | `.deb` | `7za` |
 
-> **Note:** Encrypted archives and Nextcloud's server-side encryption module are
-> not supported yet. When server-side encryption is enabled the app refuses to
-> extract and returns a message instead.
+> **Note:** Archives protected by a password are not supported. Files stored on
+> Nextcloud with server-side encryption are supported: the archive is read
+> through Nextcloud, which decrypts it before extraction.
 
 ### External storage
 
@@ -265,10 +265,20 @@ The archive tool could not unpack the file. Common causes:
 For a failed `7za` or `unrar` run the Nextcloud log records the exit code and the
 tool output. Zip extraction and a missing tool are not logged with that detail.
 
-### "Encryption is not supported yet"
+### "Unsupported archive type"
 
-The app cannot extract while Nextcloud's server-side encryption module is
-enabled.
+The file's MIME type is not one the app can extract. See
+[supported formats](#supported-formats) for the list.
+
+### Extracting a file that Nextcloud has encrypted
+
+This works. The app reads the archive through Nextcloud, which decrypts it
+first, so server-side encryption does not block extraction.
+
+### A password-protected archive
+
+Password-protected archives are not supported and will report
+"Oops something went wrong."
 
 ### Large archives
 

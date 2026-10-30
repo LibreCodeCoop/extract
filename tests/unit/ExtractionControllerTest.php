@@ -145,6 +145,45 @@ final class ExtractionControllerTest extends TestCase {
 	}
 
 	/**
+	 * Extraction must not be refused just because server-side encryption is
+	 * enabled.
+	 *
+	 * The controller used to reject every request when
+	 * `OCP\Encryption\IManager::isEnabled()` was true, which is a server-wide
+	 * setting. That blocked extraction for every user as soon as any encryption
+	 * module was enabled, even for archives that were not encrypted. Reading the
+	 * archive goes through Storage::getLocalFile(), which the encryption wrapper
+	 * serves from a decrypted temporary file, so the content is readable.
+	 *
+	 * This asserts the refusal is gone: the controller no longer takes an
+	 * encryption manager, and no code path returns that message.
+	 */
+	public function testExtractionIsNotRefusedWhenEncryptionIsEnabled(): void {
+		$source = file_get_contents(__DIR__ . '/../../lib/Controller/ExtractionController.php');
+		self::assertIsString($source);
+
+		self::assertStringNotContainsString(
+			'Encryption is not supported yet',
+			$source,
+			'the blanket encryption refusal must not come back',
+		);
+		self::assertStringNotContainsString(
+			'encryptionManager',
+			$source,
+			'the controller must not consult the server-wide encryption manager',
+		);
+
+		$constructor = new \ReflectionMethod(ExtractionController::class, '__construct');
+		foreach ($constructor->getParameters() as $parameter) {
+			self::assertNotSame(
+				'OCP\\Encryption\\IManager',
+				(string)$parameter->getType(),
+				'the encryption manager is no longer needed',
+			);
+		}
+	}
+
+	/**
 	 * The frontend gates the action on its own copy of the archive MIME list, so
 	 * the two lists must not drift apart.
 	 */
