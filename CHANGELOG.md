@@ -1,3 +1,11 @@
+## [3.1.4](https://github.com/ashcoft/extract/compare/v3.1.3...v3.1.4) (2026-10-30)
+
+
+### Bug Fixes
+
+* **extraction:** allow extraction when server-side encryption is enabled ([6924cc0](https://github.com/ashcoft/extract/commit/6924cc0c14979d64635ef9e8ea216e21cd6598fb))
+* **extraction:** guard on local storage, and propagate rar failures ([df4d49b](https://github.com/ashcoft/extract/commit/df4d49ba9685e3d063236d94a89a7c92ab233a12))
+
 ## [3.1.3](https://github.com/ashcoft/extract/compare/v3.1.2...v3.1.3) (2026-10-30)
 
 
