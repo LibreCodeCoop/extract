@@ -70,7 +70,15 @@ final class ExtractionService {
 			$list = rar_list($rar_file);
 			foreach ($list as $archive_file) {
 				$entry = rar_entry_get($rar_file, $archive_file->getName());
-				$entry->extract($extractTo);
+				if ($entry->extract($extractTo) === false) {
+					// A password-protected or damaged entry fails here; without this
+					// check the method reported success and the caller published a
+					// partial result.
+					rar_close($rar_file);
+					$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);
+					$this->logger->error('rar_entry::extract failed for ' . $archive_file->getName());
+					return $response;
+				}
 			}
 			rar_close($rar_file);
 		}

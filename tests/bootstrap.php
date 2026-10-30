@@ -15,3 +15,7 @@ if (file_exists($serverBootstrap) === true) {
 }
 
 require_once __DIR__ . '/../vendor/autoload.php';
+
+// The OCP interfaces reference OC\Hooks\Emitter, which only exists in a full
+// Nextcloud checkout. Load the stub so tests can mock those interfaces.
+require_once __DIR__ . '/stubs/oc_hooks_emitter.php';

@@ -303,6 +303,33 @@ final class ExtractionController extends AEnvironmentAwareController {
 			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Unsupported archive type')]);
 		}
 
+		try {
+			$archiveNode = $this->userFolder->get($directory . '/' . $nameOfFile);
+		} catch (NotFoundException $e) {
+			return new DataResponse(['code' => 0, 'desc' => $this->l->t('File not found')]);
+		}
+
+		// The extraction writes the result next to the archive and then relies on
+		// Nextcloud seeing it there. That only holds when the destination is real
+		// local storage: getLocalFile() returns the file inside the data directory,
+		// so dirname() is the folder Nextcloud shows.
+		//
+		// It does not hold otherwise. With server-side encryption enabled, or on
+		// object storage, getLocalFile() returns a temporary file instead
+		// (Storage\Wrapper\Encryption::getLocalFile() falls through to
+		// LocalTempFileTrait::getCachedFile(), and Common::isLocal() documents that
+		// "the common implementation returns a temporary file by default"). The
+		// destination would then resolve to something like /tmp, the extraction
+		// would land outside the data directory, and nothing would be published.
+		//
+		// Refuse in that case rather than reporting a success the user cannot see.
+		$destinationStorage = $external
+			? $this->userFolder->getStorage()
+			: $archiveNode->getStorage();
+		if ($destinationStorage->isLocal() === false) {
+			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Extraction is only supported on local storage')]);
+		}
+
 		$file = $this->getFile($directory, $nameOfFile);
 		if ($file === false) {
 			$response = ['code' => 0, 'desc' => $this->l->t('File not found')];
