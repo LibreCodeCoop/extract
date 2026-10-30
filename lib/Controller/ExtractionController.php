@@ -323,7 +323,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 		// would land outside the data directory, and nothing would be published.
 		//
 		// Refuse in that case rather than reporting a success the user cannot see.
-		$destinationStorage = $external
+		$destinationStorage = $external === true
 			? $this->userFolder->getStorage()
 			: $archiveNode->getStorage();
 		if ($destinationStorage->isLocal() === false) {
