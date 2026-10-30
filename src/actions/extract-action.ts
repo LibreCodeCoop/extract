@@ -121,8 +121,9 @@ function toFolder(extracted: ExtractedFolder): Folder {
 /**
  * Read the extracted folder out of an OCS response.
  *
- * A refusal the server describes (encryption enabled, a missing file, an
- * unsupported type) is reported with OCP.Toast and signalled by returning null.
+ * A refusal the server describes (a missing file, an unsupported type, a failure
+ * while publishing the result) is reported with OCP.Toast and signalled by
+ * returning null.
  * Throwing is deliberately avoided: the Files app would then also show its own
  * generic "{action}: failed" notification, so the user would see two messages.
  *

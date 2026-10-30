@@ -22,8 +22,10 @@ use OCP\Files\InvalidPathException;
 use OCP\Files\IRootFolder;
 
 use OCP\Files\NotFoundException;
+use OCP\Files\NotPermittedException;
 use OCP\IL10N;
 use OCP\IRequest;
+use OCP\ITempManager;
 use OCP\IURLGenerator;
 use Psr\Log\LoggerInterface;
 
@@ -76,6 +78,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 		private string $userId,
 		private IURLGenerator $urlGenerator,
 		private IFilenameValidator $filenameValidator,
+		private ITempManager $tempManager,
 	) {
 		parent::__construct($AppName, $request);
 		$this->userFolder = $this->rootFolder->getUserFolder($this->userId);
@@ -247,26 +250,149 @@ final class ExtractionController extends AEnvironmentAwareController {
 	 *
 	 * @param null|string $tmpPath The Nextcloud temporary path. This is only
 	 *                             non-null when extracting from external storage.
+	 *
+	 * @param bool $importFromScratch Whether the payload has to be imported through
+	 *                                the Nextcloud filesystem instead of being read
+	 *                                from the data directory.
 	 */
-	private function postExtract(string $fileName, string $directory, string $extractTo, ?string $tmpPath): void {
-
-		$iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($extractTo));
-		foreach ($iterator as $file) {
-			/** @var \SplFileInfo $file */
-			if (!$this->filenameValidator->isFilenameValid($file->getBasename())) {
-				$this->logger->warning(__METHOD__ . ': removing blacklisted file: ' . $file->getPathname());
-				// remove it
-				unlink($file->getPathname());
-			}
-		}
+	private function postExtract(string $fileName, string $directory, string $extractTo, ?string $tmpPath, bool $importFromScratch = false): void {
+		$this->removeForbiddenFiles($extractTo);
 
 		$NCDestination = $directory . '/' . $fileName;
-		if ($tmpPath !== null) {
+		if ($importFromScratch === true) {
+			$this->importDirectory($extractTo, $this->destinationFolder($directory, $fileName));
+		} elseif ($tmpPath !== null) {
 			$tmpFolder = $this->rootFolder->get($tmpPath);
 			$tmpFolder->move($this->userFolder->getFullPath($NCDestination));
 		} else {
 			// This seems to be enough to trigger a files-cache refresh
 			$this->userFolder->get($NCDestination);
+		}
+	}
+
+	/**
+	 * Delete every extracted file whose name Nextcloud forbids.
+	 *
+	 * @param string $directory The local file-system path of the extracted tree.
+	 */
+	private function removeForbiddenFiles(string $directory): void {
+		// SKIP_DOTS matters: without it the iterator yields `.` and `..` for every
+		// directory in the tree, which isFilenameValid() rejects and unlink() then
+		// fails on.
+		$iterator = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+		);
+		foreach ($iterator as $file) {
+			/** @var \SplFileInfo $file */
+			if (!$this->filenameValidator->isFilenameValid($file->getBasename())) {
+				$this->logger->warning(__METHOD__ . ': removing blacklisted file: ' . $file->getPathname());
+				unlink($file->getPathname());
+			}
+		}
+	}
+
+	/**
+	 * Resolve the folder the extracted tree is imported into, creating it if needed.
+	 *
+	 * The local path lets the extraction merge into an existing folder, so the
+	 * import must do the same instead of failing when a folder of that name is
+	 * already present.
+	 *
+	 * @param string $directory The Nextcloud directory holding the archive.
+	 * @param string $fileName The result-folder name.
+	 */
+	private function destinationFolder(string $directory, string $fileName): Folder {
+		$parent = $this->userFolder->get($directory);
+		if ($parent instanceof Folder === false) {
+			throw new NotPermittedException('The archive is not inside a folder');
+		}
+		if ($parent->nodeExists($fileName) === true) {
+			$existing = $parent->get($fileName);
+			if ($existing instanceof Folder === false) {
+				throw new NotPermittedException($fileName . ' already exists and is not a folder');
+			}
+			return $existing;
+		}
+
+		return $parent->newFolder($fileName);
+	}
+
+	/**
+	 * Copy an extracted tree into a Nextcloud folder through the files API.
+	 *
+	 * This is the import step for destinations where the archive cannot be unpacked
+	 * beside the original file (object storage, or server-side encryption). Every
+	 * entry is created with the files API, so the files-cache entries and the write
+	 * hooks are produced by the copy itself instead of relying on the storage being
+	 * scanned afterwards.
+	 *
+	 * Directories are visited before their contents, so a parent always exists when
+	 * its children are written.
+	 *
+	 * @param string $source The local file-system path of the extracted tree.
+	 * @param Folder $target The Nextcloud folder that receives the tree's contents.
+	 */
+	private function importDirectory(string $source, Folder $target): void {
+		$source = rtrim($source, '/');
+		$iterator = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS),
+			\RecursiveIteratorIterator::SELF_FIRST,
+		);
+		foreach ($iterator as $entry) {
+			/** @var \SplFileInfo $entry */
+			$relative = ltrim(substr($entry->getPathname(), strlen($source)), '/');
+			if ($entry->isDir() === true) {
+				$this->importFolder($target, $relative);
+				continue;
+			}
+
+			$this->importFile($target, $relative, $entry->getPathname());
+		}
+	}
+
+	/**
+	 * Return the folder at $relative, creating it when it does not exist yet.
+	 *
+	 * Merging into an existing folder mirrors the local path, where the extraction
+	 * unpacks into whatever folder already sits at the destination name.
+	 *
+	 * @param Folder $target The folder that receives the tree.
+	 * @param string $relative The path of the folder within $target.
+	 */
+	private function importFolder(Folder $target, string $relative): Folder {
+		if ($target->nodeExists($relative) === true) {
+			$existing = $target->get($relative);
+			if ($existing instanceof Folder === false) {
+				throw new NotPermittedException($relative . ' exists and is not a folder');
+			}
+			return $existing;
+		}
+
+		return $target->newFolder($relative);
+	}
+
+	/**
+	 * Write one extracted file into the target folder.
+	 *
+	 * The stream is handed to the files API so a large file is not read into memory.
+	 * The API closes it as part of the write; the guard here covers the path where it
+	 * does not, so the handle never leaks or gets closed twice.
+	 *
+	 * @param Folder $target The folder that receives the tree.
+	 * @param string $relative The path of the file within $target.
+	 * @param string $path The local file-system path of the extracted file.
+	 */
+	private function importFile(Folder $target, string $relative, string $path): void {
+		$handle = fopen($path, 'rb');
+		if ($handle === false) {
+			throw new NotPermittedException('Could not read ' . $path);
+		}
+		try {
+			$target->newFile($relative, $handle);
+		} finally {
+			if (is_resource($handle) === true) {
+				fclose($handle);
+			}
 		}
 	}
 
@@ -309,60 +435,67 @@ final class ExtractionController extends AEnvironmentAwareController {
 			return new DataResponse(['code' => 0, 'desc' => $this->l->t('File not found')]);
 		}
 
-		// The extraction writes the result next to the archive and then relies on
-		// Nextcloud seeing it there. That only holds when the destination is real
-		// local storage: getLocalFile() returns the file inside the data directory,
-		// so dirname() is the folder Nextcloud shows.
+		// The extraction unpacks the archive next to the original file and then
+		// relies on Nextcloud seeing the result in the data directory. That only
+		// works when the destination is real local storage, because getLocalFile()
+		// then returns a path inside the data directory.
 		//
-		// It does not hold otherwise. With server-side encryption enabled, or on
-		// object storage, getLocalFile() returns a temporary file instead
-		// (Storage\Wrapper\Encryption::getLocalFile() falls through to
-		// LocalTempFileTrait::getCachedFile(), and Common::isLocal() documents that
-		// "the common implementation returns a temporary file by default"). The
-		// destination would then resolve to something like /tmp, the extraction
-		// would land outside the data directory, and nothing would be published.
-		//
-		// Refuse in that case rather than reporting a success the user cannot see.
-		$destinationStorage = $external === true
-			? $this->userFolder->getStorage()
-			: $archiveNode->getStorage();
-		if ($destinationStorage->isLocal() === false) {
-			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Extraction is only supported on local storage')]);
-		}
-
+		// On object storage, or with server-side encryption enabled, getLocalFile()
+		// returns a temporary copy instead (Storage\Wrapper\Encryption::getLocalFile()
+		// falls through to LocalTempFileTrait::getCachedFile(), and Common::isLocal()
+		// documents that "the common implementation returns a temporary file by
+		// default"). Unpacking beside such a path would land outside the data
+		// directory and nothing would be published. Unpack into a request-owned local
+		// directory and import the tree through the Nextcloud filesystem instead.
+		// Folder the result is published under: both suffixes are dropped for a
+		// compressed tarball, so archive.tar.gz and archive.tar both become
+		// archive. For every other format this is the name without extension.
+		$fileName = $resultFolder;
 		$file = $this->getFile($directory, $nameOfFile);
 		if ($file === false) {
 			$response = ['code' => 0, 'desc' => $this->l->t('File not found')];
 			return new DataResponse($response);
 		}
-		$dir = dirname($file);
-		// Folder the result is published under: both suffixes are dropped for a
-		// compressed tarball, so archive.tar.gz and archive.tar both become
-		// archive. For every other format this is the name without extension.
-		$fileName = $resultFolder;
-		$extractTo = $dir . '/' . $fileName;
 
-		// if the file is an external storage
-		if ($external) {
-			$appPath = $this->userId . '/' . $this->appName;
-			try {
-				$appDirectory = $this->rootFolder->get($appPath);
-			} catch (\OCP\Files\NotFoundException $e) {
-				$appDirectory = $this->rootFolder->newFolder($appPath);
+		$destinationStorage = $external === true
+			? $this->userFolder->getStorage()
+			: $archiveNode->getStorage();
+		$importFromScratch = $destinationStorage->isLocal() === false;
+
+		$scratch = null;
+		if ($importFromScratch === true) {
+			$scratch = $this->tempManager->getTemporaryFolder();
+			if ($scratch === false) {
+				$this->logger->error(__METHOD__ . ': could not create a temporary extraction directory');
+				return new DataResponse(['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);
 			}
-			$archiveDir = $fileName;
-
-			// remove temporary directory if exists from interrupted previous runs
-			try {
-				$appDirectory->get($archiveDir)->delete();
-			} catch (\OCP\Files\NotFoundException $e) {
-				// ok
-			}
-
-			$tmpPath = $appDirectory->getPath() . '/' . $archiveDir;
-			$extractTo = $appDirectory->getStorage()->getLocalFile($appDirectory->getInternalPath()) . '/' . $archiveDir;
-		} else {
 			$tmpPath = null;
+			$extractTo = rtrim($scratch, '/') . '/' . $fileName;
+		} else {
+			$extractTo = dirname($file) . '/' . $fileName;
+
+			// if the file is an external storage
+			if ($external) {
+				$appPath = $this->userId . '/' . $this->appName;
+				try {
+					$appDirectory = $this->rootFolder->get($appPath);
+				} catch (\OCP\Files\NotFoundException $e) {
+					$appDirectory = $this->rootFolder->newFolder($appPath);
+				}
+				$archiveDir = $fileName;
+
+				// remove temporary directory if exists from interrupted previous runs
+				try {
+					$appDirectory->get($archiveDir)->delete();
+				} catch (\OCP\Files\NotFoundException $e) {
+					// ok
+				}
+
+				$tmpPath = $appDirectory->getPath() . '/' . $archiveDir;
+				$extractTo = $appDirectory->getStorage()->getLocalFile($appDirectory->getInternalPath()) . '/' . $archiveDir;
+			} else {
+				$tmpPath = null;
+			}
 		}
 
 		switch ($type) {
@@ -385,10 +518,22 @@ final class ExtractionController extends AEnvironmentAwareController {
 		// Report the failure as the service described it instead of running the
 		// post-processing over a destination that was never created.
 		if (($response['code'] ?? 0) === 0) {
+			if ($scratch !== null) {
+				$this->removeDirectory($scratch);
+			}
 			return new DataResponse($response);
 		}
 
-		$this->postExtract($fileName, $directory, $extractTo, $tmpPath);
+		try {
+			$this->postExtract($fileName, $directory, $extractTo, $tmpPath, $importFromScratch);
+		} catch (NotFoundException|NotPermittedException|InvalidPathException $e) {
+			$this->logger->error(__METHOD__ . ': could not publish the extracted folder: ' . $e->getMessage());
+			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);
+		} finally {
+			if ($scratch !== null) {
+				$this->removeDirectory($scratch);
+			}
+		}
 
 		try {
 			// collect and return the properties of the resulting folder node

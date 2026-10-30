@@ -142,11 +142,11 @@ for archives whose MIME type the app can extract.
 | 7z | `.7z` | `7za` |
 | Deb | `.deb` | `7za` |
 
-> **Note:** Archives protected by a password are not supported. Extraction needs
-> local storage: it unpacks the archive next to the original file, so it works
-> on a normal Nextcloud data directory but not on object storage or with
-> server-side encryption enabled, where the app reports that extraction is only
-> supported on local storage.
+> **Note:** Archives protected by a password are not supported. Extraction works
+> on a normal Nextcloud data directory, on object storage and with server-side
+> encryption enabled. On non-local storage the archive is unpacked into a
+> temporary directory and the result is imported through the Nextcloud
+> filesystem, so it appears in the Files app like any other folder.
 
 ### External storage
 
@@ -272,21 +272,24 @@ tool output. Zip extraction and a missing tool are not logged with that detail.
 The file's MIME type is not one the app can extract. See
 [supported formats](#supported-formats) for the list.
 
-### "Extraction is only supported on local storage"
+### Extraction on object storage or with server-side encryption
 
-Extraction unpacks the archive next to the original file, and Nextcloud then
-picks the result up from the data directory. That only works when the storage
-really is local, so the app refuses in these cases:
+This works. Nextcloud cannot hand out a path inside the data directory there, so
+the archive is unpacked into a temporary directory and the result is imported
+through the Nextcloud filesystem. The extracted folder then appears in the Files
+app like any other folder.
 
 - **Object storage** (S3, Swift, …). `getLocalFile()` returns a temporary copy
   rather than a file in the data directory.
 - **Server-side encryption enabled.** The encryption storage wrapper does the
   same, because it has to decrypt to a temporary file first.
 
-The check is on `Storage::isLocal()`, which is false for both. Archives are still
-readable in these setups; the limitation is that the extracted folder cannot be
-published back to Nextcloud. Supporting them needs an import step that writes
-through the Nextcloud filesystem rather than beside the archive.
+The app detects both through `Storage::isLocal()`. On local storage it keeps
+unpacking the archive next to the original file, which avoids copying the
+payload a second time.
+
+If extraction used to report "Extraction is only supported on local storage" on
+these setups, update to a version that includes the import step.
 
 ### A password-protected archive
 
