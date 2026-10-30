@@ -142,9 +142,11 @@ for archives whose MIME type the app can extract.
 | 7z | `.7z` | `7za` |
 | Deb | `.deb` | `7za` |
 
-> **Note:** Encrypted archives and Nextcloud's server-side encryption module are
-> not supported yet. When server-side encryption is enabled the app refuses to
-> extract and returns a message instead.
+> **Note:** Archives protected by a password are not supported. Extraction needs
+> local storage: it unpacks the archive next to the original file, so it works
+> on a normal Nextcloud data directory but not on object storage or with
+> server-side encryption enabled, where the app reports that extraction is only
+> supported on local storage.
 
 ### External storage
 
@@ -265,10 +267,32 @@ The archive tool could not unpack the file. Common causes:
 For a failed `7za` or `unrar` run the Nextcloud log records the exit code and the
 tool output. Zip extraction and a missing tool are not logged with that detail.
 
-### "Encryption is not supported yet"
+### "Unsupported archive type"
 
-The app cannot extract while Nextcloud's server-side encryption module is
-enabled.
+The file's MIME type is not one the app can extract. See
+[supported formats](#supported-formats) for the list.
+
+### "Extraction is only supported on local storage"
+
+Extraction unpacks the archive next to the original file, and Nextcloud then
+picks the result up from the data directory. That only works when the storage
+really is local, so the app refuses in these cases:
+
+- **Object storage** (S3, Swift, …). `getLocalFile()` returns a temporary copy
+  rather than a file in the data directory.
+- **Server-side encryption enabled.** The encryption storage wrapper does the
+  same, because it has to decrypt to a temporary file first.
+
+The check is on `Storage::isLocal()`, which is false for both. Archives are still
+readable in these setups; the limitation is that the extracted folder cannot be
+published back to Nextcloud. Supporting them needs an import step that writes
+through the Nextcloud filesystem rather than beside the archive.
+
+### A password-protected archive
+
+Password-protected archives are not supported. Zip and the 7-Zip formats report
+"Oops something went wrong."; Rar with the PHP `rar` extension is the exception,
+because that path does not surface a failure.
 
 ### Large archives
 

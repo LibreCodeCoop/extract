@@ -10,7 +10,17 @@ declare(strict_types=1);
 namespace OCA\Extract\Tests\unit;
 
 use OCA\Extract\Controller\ExtractionController;
+use OCA\Extract\Service\ExtractionService;
+use OCP\Files\File;
+use OCP\Files\Folder;
+use OCP\Files\IFilenameValidator;
+use OCP\Files\IRootFolder;
+use OCP\Files\Storage\IStorage;
+use OCP\IL10N;
+use OCP\IRequest;
+use OCP\IURLGenerator;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
 /**
  * Guards the mapping between the archive MIME types Nextcloud reports and the
@@ -142,6 +152,109 @@ final class ExtractionControllerTest extends TestCase {
 				"$fileName must not be accepted as a result folder",
 			);
 		}
+	}
+
+	/**
+	 * Extraction must be refused when the destination is not real local storage.
+	 *
+	 * The result is written beside the archive and Nextcloud is expected to see it
+	 * in the data directory. With server-side encryption enabled, or on object
+	 * storage, getLocalFile() returns a temporary file instead, so the destination
+	 * would resolve outside the data directory and nothing would be published.
+	 *
+	 * This drives execute() with a non-local storage and asserts the extraction
+	 * service is never reached, which a source-text scan cannot prove.
+	 */
+	public function testExecuteRefusesNonLocalStorage(): void {
+		$storage = $this->createMock(IStorage::class);
+		$storage->method('isLocal')->willReturn(false);
+
+		$node = $this->createMock(File::class);
+		$node->method('getStorage')->willReturn($storage);
+
+		$userFolder = $this->createMock(Folder::class);
+		$userFolder->method('get')->willReturn($node);
+
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder->method('getUserFolder')->willReturn($userFolder);
+
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(
+			static fn (string $text, $parameters = []): string => $text,
+		);
+
+		// A real service instance: it is final, so it cannot be doubled. The
+		// refusal must happen before the archive is ever opened, which the
+		// assertion on the response below proves.
+		$service = new ExtractionService($l10n, $this->createMock(LoggerInterface::class));
+
+		$controller = new ExtractionController(
+			'extract',
+			$this->createMock(IRequest::class),
+			$service,
+			$rootFolder,
+			$l10n,
+			$this->createMock(LoggerInterface::class),
+			'user',
+			$this->createMock(IURLGenerator::class),
+			$this->createMock(IFilenameValidator::class),
+		);
+
+		$response = $controller->execute('archive.zip', '/', false, 'application/zip');
+		$data = $response->getData();
+
+		self::assertSame(0, $data['code']);
+		self::assertSame('Extraction is only supported on local storage', $data['desc']);
+	}
+
+	/**
+	 * The same guard must not fire for ordinary local storage.
+	 */
+	public function testExecuteAllowsLocalStorage(): void {
+		$storage = $this->createMock(IStorage::class);
+		$storage->method('isLocal')->willReturn(true);
+
+		// getFile() calls this and requires a string path.
+		$storage->method('getLocalFile')->willReturn('/tmp/extract-test-archive.zip');
+
+		$node = $this->createMock(File::class);
+		$node->method('getStorage')->willReturn($storage);
+		$node->method('getInternalPath')->willReturn('files/archive.zip');
+
+		$userFolder = $this->createMock(Folder::class);
+		$userFolder->method('get')->willReturn($node);
+
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder->method('getUserFolder')->willReturn($userFolder);
+
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(
+			static fn (string $text, $parameters = []): string => $text,
+		);
+
+		// A real service instance. The archive path does not exist, so
+		// extractZip() reports "Cannot open Zip file" — reaching it proves the
+		// local-storage guard let the request through.
+		$service = new ExtractionService($l10n, $this->createMock(LoggerInterface::class));
+
+		$controller = new ExtractionController(
+			'extract',
+			$this->createMock(IRequest::class),
+			$service,
+			$rootFolder,
+			$l10n,
+			$this->createMock(LoggerInterface::class),
+			'user',
+			$this->createMock(IURLGenerator::class),
+			$this->createMock(IFilenameValidator::class),
+		);
+
+		$response = $controller->execute('archive.zip', '/', false, 'application/zip');
+		$data = $response->getData();
+		self::assertSame(0, $data['code']);
+		// Not the storage refusal: the request reached the extraction service.
+		self::assertNotSame('Extraction is only supported on local storage', $data['desc']);
+		self::assertSame('Cannot open Zip file', $data['desc']);
 	}
 
 	/**
