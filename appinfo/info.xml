@@ -25,10 +25,13 @@
     * **AND**
     * p7zip (sudo apt-get install p7zip p7zip-full)
 
-*  **Note :** Encrypted files are not supported yet
+*  **Note :** Password-protected archives are not supported yet. Object storage
+   and server-side encryption are supported: the archive is unpacked into a
+   temporary directory and the result is imported through the Nextcloud
+   filesystem.
 ]]></description>
 
-    <version>3.0.0</version>
+    <version>3.1.6</version>
     <licence>agpl</licence>
     <author mail="paulereverend@gmail.com">Paul Lereverend</author>
     <namespace>Extract</namespace>
@@ -38,6 +41,6 @@
     <bugs>https://github.com/PaulLereverend/NextcloudExtract/issues</bugs>
     <screenshot>https://raw.githubusercontent.com/PaulLereverend/NextcloudExtract/master/img/extract.png</screenshot>
     <dependencies>
-        <nextcloud min-version="33" max-version="33"/>
+        <nextcloud min-version="33" max-version="35"/>
     </dependencies>
 </info>

@@ -1,6 +1,6 @@
 # This workflow is provided via the organization template repository
 #
-# https://github.com/LibreCodeCoop/.github
+# https://github.com/nextcloud/.github
 # https://docs.github.com/en/actions/learn-github-actions/sharing-workflows-with-your-organization
 #
 # SPDX-FileCopyrightText: 2022-2024 Nextcloud GmbH and Nextcloud contributors
@@ -30,13 +30,24 @@ jobs:
 
       - name: Get php version
         id: versions
-        uses: nextcloud-libraries/nextcloud-version-matrix@cd0211ffcef1065e2020cd579e4843b8746e7a58 # v1.3.3
+        uses: icewind1991/nextcloud-version-matrix@cd0211ffcef1065e2020cd579e4843b8746e7a58 # v1.3.3
 
       - name: Check enforcement of minimum PHP version ${{ steps.versions.outputs.php-min }} in psalm.xml
-        run: grep 'phpVersion="${{ steps.versions.outputs.php-min }}' psalm.xml
+        run: |
+          PHP_MIN=${{ steps.versions.outputs.php-min }}
+          PHP_MIN_MAJOR=$(echo "$PHP_MIN" | cut -d. -f1)
+          PHP_MIN_MINOR=$(echo "$PHP_MIN" | cut -d. -f2)
+          grep -qE "phpVersion=\"$PHP_MIN_MAJOR\.[0-9]+\"" psalm.xml || (echo "phpVersion must be >= $PHP_MIN" && exit 1)
+          CURRENT=$(grep -oE 'phpVersion="[0-9]+\.[0-9]+"' psalm.xml | grep -oE '[0-9]+\.[0-9]+')
+          CURRENT_MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          CURRENT_MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          if [ "$CURRENT_MAJOR" -lt "$PHP_MIN_MAJOR" ] || ([ "$CURRENT_MAJOR" -eq "$PHP_MIN_MAJOR" ] && [ "$CURRENT_MINOR" -lt "$PHP_MIN_MINOR" ]); then
+            echo "phpVersion $CURRENT is less than minimum $PHP_MIN"
+            exit 1
+          fi
 
       - name: Set up php${{ steps.versions.outputs.php-available }}
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
         with:
           php-version: ${{ steps.versions.outputs.php-available }}
           extensions: bz2, ctype, curl, dom, fileinfo, gd, iconv, intl, json, libxml, mbstring, openssl, pcntl, posix, session, simplexml, xmlreader, xmlwriter, zip, zlib, sqlite, pdo_sqlite
@@ -47,14 +58,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Remove nextcloud/ocp
+      - name: Install dependencies
         run: |
           composer remove nextcloud/ocp --dev --no-scripts
+          composer i
 
-      - name: Install composer dependencies
-        uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
-
-      - name: Install nextcloud/ocp:dev-${{ steps.versions.outputs.branches-max }}
+      - name: Install nextcloud/ocp
         run: composer require --dev nextcloud/ocp:dev-${{ steps.versions.outputs.branches-max }} --ignore-platform-reqs --with-dependencies
 
       - name: Run coding standards check

@@ -1,6 +1,6 @@
 {
   "name": "extract",
-  "version": "3.0.0",
+  "version": "3.1.6",
   "private": true,
   "description": "Allows to extract archive from the web interface.",
   "license": "agpl",
@@ -22,28 +22,42 @@
     "watch": "vite build --mode development --watch"
   },
   "browserslist": [
-    "extends @nextcloud/browserslist-config"
+    "extends @nextcloud/browserslist-config",
+    "not chrome 109",
+    "not edge 109",
+    "not ios_saf 11"
   ],
+  "overrides": {
+    "js-yaml": "4.3.2"
+  },
   "dependencies": {
     "@mdi/svg": "^7.4.47",
-    "@nextcloud/axios": "^2.5.1",
-    "@nextcloud/files": "^3.12.0",
-    "@nextcloud/l10n": "^3.4.0",
-    "@nextcloud/logger": "^3.0.2",
-    "@nextcloud/router": "^3.0.1"
+    "@nextcloud/axios": "^2.6.0",
+    "@nextcloud/event-bus": "^3.3.1",
+    "@nextcloud/files": "^4.1.0",
+    "@nextcloud/l10n": "^3.4.1",
+    "@nextcloud/logger": "^3.0.3",
+    "@nextcloud/router": "^3.1.0"
   },
   "devDependencies": {
-    "@nextcloud/browserslist-config": "^3.0.1",
-    "@nextcloud/eslint-config": "^9.0.0-rc.5",
-    "@nextcloud/stylelint-config": "^3.1.0",
-    "@nextcloud/vite-config": "^2.5.0",
+    "@nextcloud/browserslist-config": "^3.1.2",
+    "@nextcloud/eslint-config": "^9.0.1",
+    "@nextcloud/stylelint-config": "^3.2.2",
+    "@nextcloud/typings": "^1.10.0",
+    "@nextcloud/vite-config": "^3.0.0-beta.1",
+    "@semantic-release/changelog": "^7.0.0",
+    "@semantic-release/exec": "^7.0.0",
+    "@semantic-release/git": "^11.0.0",
+    "conventional-changelog-conventionalcommits": "^10.0.0",
     "esbuild-loader": "^4.3.0",
-    "openapi-typescript": "^7.9.1",
+    "openapi-typescript": "^7.13.0",
+    "semantic-release": "^25.0.0",
     "ts-loader": "^9.5.4",
-    "vite": "^7.1.5"
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5"
   },
   "engines": {
-    "node": "^22.0.0",
-    "npm": "^10.5.0"
+    "node": ">=24",
+    "npm": "^10.5.0 || ^11.0.0"
   }
 }
