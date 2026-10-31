@@ -1,7 +1,15 @@
 OC.L10N.register(
     "extract",
     {
+    "Encryption is not supported yet" : "Criptarea nu este acceptată încă",
     "File not found" : "Fișierul nu a fost găsit",
+    "Zip extension is not available" : "Extensia Zip nu este disponibilă",
+    "Cannot open Zip file" : "Fișierul Zip nu poate fi deschis",
+    "Oops something went wrong. Check that you have rar extension or unrar installed" : "Hopa, ceva nu a mers bine. Verifică dacă ai instalată extensia rar sau unrar",
+    "Oops something went wrong." : "Hopa, ceva nu a mers bine.",
+    "Extract" : "Extrage",
+    "Extract archive from the web interface" : "Extrage arhive din interfața web",
+    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "Extrage arhive.\n\n*  **Formate acceptate :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Cerințe :**\n    * Extensia PHP Rar  (pecl -v install rar)\n\n    * **SAU**\n    * unrar (sudo apt-get install unrar)\n\n    * **ȘI**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Notă :** Fișierele criptate nu sunt acceptate încă",
     "Extract here" : "Extrage aici"
 },
 "nplurals=3; plural=(n==1?0:(((n%100>19)||((n%100==0)&&(n!=0)))?2:1));");
