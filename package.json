@@ -1,6 +1,6 @@
 {
   "name": "extract",
-  "version": "3.1.5",
+  "version": "3.1.6",
   "private": true,
   "description": "Allows to extract archive from the web interface.",
   "license": "agpl",
