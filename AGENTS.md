@@ -1,3 +1,8 @@
+<!--
+ - SPDX-FileCopyrightText: 2025 LibreCode coop and contributors
+ - SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Agent notes for `extract`
 
 ## Branching and releases — read this first
@@ -15,10 +20,16 @@ Required workflow:
 Do not merge a change yourself, and do not push commits straight to `main`.
 
 Why this matters here: pushing to `main` triggers the automated Release workflow
-(`.github/workflows/release.yml`). It runs semantic-release, bumps the version,
-creates a tag and publishes a GitHub release. A direct push therefore ships a
-release immediately, with no review step, and it cannot be undone cleanly once
-the tag and release exist.
+(`.github/workflows/release.yml`). For a push whose commits are release-worthy,
+that workflow runs semantic-release, bumps the version, creates a tag and
+publishes a GitHub release, so the change ships with no review step and cannot
+be undone cleanly once the tag and release exist.
+
+Not every push releases. `release.config.cjs` marks maintenance commits
+(`chore`, `docs`, `ci`, `refactor`, `style`, `test`, `build`, `revert`) as
+no-release, and the job is skipped entirely when the head commit message
+contains `skip release`. A direct push of such a change produces no release, but
+it still lands on `main` without review — which is the reason for the rule.
 
 Also do not rewrite published history (no force-push, no rebasing `main`) to
 undo a change that already landed. If a change reached `main` by mistake, say so
@@ -41,8 +52,11 @@ composer run lint          # php -l over every PHP file
 npm run lint               # ESLint (needs npm ci first)
 ```
 
-The unit suite needs PHP 8.1+ with the `zip` extension, plus `7za` on the `PATH`
-for the 7z and tarball tests, which skip themselves when the binary is absent.
+The unit suite needs PHP 8.1 through 8.x (`composer.json` requires `^8.1`) with
+the `zip` and `zlib` extensions. `zlib` is required because
+`WrappedTarballExtractionTest` builds its gzip fixtures with `Phar::GZ`. The 7z
+and tarball tests also need `7za` on the `PATH`, and skip themselves when the
+binary is absent.
 
 ## Style
 
@@ -50,3 +64,6 @@ for the 7z and tarball tests, which skip themselves when the binary is absent.
   standard enforced by `composer run cs:check`.
 - Write comments only where the code cannot speak for itself; do not narrate the
   change or restate the code.
+- Every file needs REUSE copyright and licence information. `reuse` accepts an
+  SPDX comment block at the top of the file, or an entry in `REUSE.toml`. A file
+  with neither fails the `reuse-compliance-check` job.
