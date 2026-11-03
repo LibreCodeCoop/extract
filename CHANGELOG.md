@@ -1,3 +1,10 @@
+## [3.1.7](https://github.com/ashcoft/extract/compare/v3.1.6...v3.1.7) (2026-11-03)
+
+
+### Bug Fixes
+
+* **l10n:** Update translations from Transifex ([94aa76a](https://github.com/ashcoft/extract/commit/94aa76a508eb27a8f8344a283d1072ce75b2fbeb))
+
 ## [3.1.6](https://github.com/ashcoft/extract/compare/v3.1.5...v3.1.6) (2026-10-31)
 
 
