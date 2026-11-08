@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2025 Nextcloud GmbH and Nextcloud contributors
+# SPDX-License-Identifier: MIT
+
+# workflow-lock-schema: 3
+
+{"workflow":"npm-audit-fix.yml","sha256":"83014ebcc694e018a6e5d874c28199efb8c83d01f3e2451e8116f88d952ab2d5","catalog_commit":"d392d8d706088c6082903093c80762c1f8e2474f"}
