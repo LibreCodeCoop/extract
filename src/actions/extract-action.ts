@@ -3,84 +3,225 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import type { Node, View } from '@nextcloud/files'
+import type { ActionContext, ActionContextSingle, IFileAction, IFolder, INode } from '@nextcloud/files'
 
 import ArchiveArrowUpSvg from '@mdi/svg/svg/archive-arrow-up.svg?raw'
 import axios from '@nextcloud/axios'
 import { emit } from '@nextcloud/event-bus'
-import { FileAction, Folder, Permission } from '@nextcloud/files'
+import { Folder, Permission, registerFileAction } from '@nextcloud/files'
 import { translate as t } from '@nextcloud/l10n'
 import { generateOcsUrl } from '@nextcloud/router'
 
-export const extractAction = new FileAction({
+/**
+ * MIME types the backend can extract.
+ *
+ * These mirror ExtractionController::SUPPORTED_MIME_TYPES on the server, so the
+ * action is only offered for archives the OCS endpoint accepts. Nextcloud
+ * reports `application/gzip` for .gz and .tgz.
+ */
+export const SUPPORTED_ARCHIVE_MIME_TYPES = [
+	'application/zip',
+	'application/x-rar-compressed',
+	'application/x-tar',
+	'application/gzip',
+	'application/x-gzip',
+	'application/x-7z-compressed',
+	'application/x-bzip2',
+	'application/x-deb',
+	'application/x-compressed',
+]
+
+interface ExtractedFolder {
+	fileId: number
+	source: string
+	root: string
+	owner: string | null
+	permissions: number
+	mtime: number
+	'mount-type': string
+	'owner-display-name': string | null
+}
+
+interface ExtractionResponse {
+	ocs: {
+		data: {
+			code?: number
+			desc?: string
+			extracted?: ExtractedFolder
+		}
+	}
+}
+
+// The helpers below are module-scoped function declarations. The project's
+// ESLint config (antfu/top-level-function) requires the `function` keyword, so
+// they cannot be arrow functions. skipcq silences DeepSource's JS-0067, which
+// assumes these are globals that could collide with other scripts.
+/**
+ * Resolve the archive MIME type of a node.
+ *
+ * `node.mime` is the resolved MIME type. It falls back to
+ * `application/octet-stream` when the type could not be determined, in which
+ * case the raw DAV property is used so an unresolved archive can still be
+ * recognised.
+ *
+ * @param node The node to inspect
+ */
+// skipcq: JS-0067
+function archiveMimeOf(node: INode): string | undefined {
+	const mime = node.mime
+	if (mime !== '' && mime !== 'application/octet-stream') {
+		return mime
+	}
+	return node.attributes?.getcontenttype as string | undefined
+}
+
+/**
+ * Whether a node is an archive the app can extract.
+ *
+ * @param node The node to inspect
+ */
+// skipcq: JS-0067
+function isSupportedArchive(node: INode): boolean {
+	const mime = archiveMimeOf(node)
+	return mime !== undefined && SUPPORTED_ARCHIVE_MIME_TYPES.includes(mime)
+}
+
+/**
+ * Whether a node lives on an external storage.
+ *
+ * @param node The node to inspect
+ */
+// skipcq: JS-0067
+function isExternalStorage(node: INode): boolean {
+	return String(node.attributes?.['mount-type'] ?? '').startsWith('external')
+}
+
+/**
+ * Build the folder node the server created.
+ *
+ * @param extracted The folder description returned by the server
+ */
+// skipcq: JS-0067
+function toFolder(extracted: ExtractedFolder): Folder {
+	return new Folder({
+		id: extracted.fileId,
+		source: extracted.source,
+		root: extracted.root,
+		owner: extracted.owner,
+		permissions: extracted.permissions,
+		mtime: new Date(extracted.mtime * 1000),
+		attributes: {
+			'mount-type': extracted['mount-type'],
+			'owner-id': extracted.owner,
+			'owner-display-name': extracted['owner-display-name'],
+		},
+	})
+}
+
+/**
+ * Read the extracted folder out of an OCS response.
+ *
+ * A refusal the server describes (a missing file, an unsupported type, a failure
+ * while publishing the result) is reported with OCP.Toast and signalled by
+ * returning null.
+ * Throwing is deliberately avoided: the Files app would then also show its own
+ * generic "{action}: failed" notification, so the user would see two messages.
+ *
+ * @param response The parsed OCS response
+ */
+// skipcq: JS-0067
+function readExtractedFolder(response: ExtractionResponse): ExtractedFolder | null {
+	const { code, desc, extracted } = response.ocs.data
+
+	if (code === 0 || extracted === undefined) {
+		window.OCP.Toast.error(desc ?? t('extract', 'Extraction failed'))
+		return null
+	}
+
+	return extracted
+}
+
+/**
+ * Build the request body for the extraction endpoint.
+ *
+ * @param node The archive to extract
+ * @param folder The folder the archive lives in
+ */
+// skipcq: JS-0067
+function buildRequestBody(node: INode, folder: IFolder) {
+	return {
+		nameOfFile: node.basename,
+		directory: folder.path,
+		external: isExternalStorage(node) ? 1 : 0,
+		mime: archiveMimeOf(node),
+	}
+}
+
+/**
+ * Whether the action applies to the current selection.
+ *
+ * @param context The file action context
+ */
+// skipcq: JS-0067
+function isEnabled(context: ActionContext): boolean {
+	if (context.nodes.length !== 1) {
+		return false
+	}
+
+	const [node] = context.nodes
+	return node !== undefined
+		&& isSupportedArchive(node)
+		&& (node.permissions & Permission.UPDATE) !== 0
+}
+
+/**
+ * Extract the selected archive and add the resulting folder to the file list.
+ *
+ * @param context The file action context
+ */
+// skipcq: JS-0067
+async function exec(context: ActionContextSingle): Promise<boolean | null> {
+	const [node] = context.nodes
+	if (node === undefined) {
+		return false
+	}
+
+	const url = generateOcsUrl('/apps/extract/api/v1/extraction/execute')
+	const { data: response } = await axios.post<ExtractionResponse>(
+		url,
+		buildRequestBody(node, context.folder),
+	)
+	const extracted = readExtractedFolder(response)
+	if (extracted === null) {
+		// The reason was already shown; stay silent so the Files app does not add
+		// a second, generic notification.
+		return null
+	}
+
+	emit('files:node:created', toFolder(extracted))
+
+	window.OCP.Files.Router.goToRoute(
+		null,
+		{ view: 'files', fileid: String(extracted.fileId) },
+		{ dir: context.folder.path },
+	)
+
+	return null
+}
+
+export const extractAction: IFileAction = {
 	id: 'extract',
 	displayName: () => t('extract', 'Extract here'),
 	iconSvgInline: () => ArchiveArrowUpSvg,
-
-	enabled(nodes: Node[]) {
-		if (nodes.length !== 1) {
-			return false
-		}
-
-		const node = nodes[0]!
-
-		const ct = node.attributes?.getcontenttype as string | undefined
-
-		if (
-			ct === 'application/zip'
-			|| ct === 'application/x-tar'
-			|| ct === 'application/gzip'
-			|| ct === 'application/x-rar-compressed'
-			|| ct === 'application/x-7z-compressed'
-			|| ct === 'application/x-deb'
-			|| ct === 'application/x-bzip2'
-		) {
-			return (node.permissions & Permission.UPDATE) !== 0
-		}
-
-		return false
-	},
-
-	async exec(node: Node, view: View, dir: string) {
-		const data = {
-			nameOfFile: node.attributes?.basename ?? '',
-			directory: dir,
-			external: node.attributes?.['mount-type']?.startsWith('external') ? 1 : 0,
-			mime: node.attributes?.mime,
-		}
-
-		const url = generateOcsUrl('/apps/extract/api/v1/extraction/execute')
-		axios.post(url, data)
-			.then(({ data }) => {
-				const time = data.ocs.data.extracted.mtime * 1000
-				const folder = new Folder({
-					id: data.ocs.data.extracted.fileId,
-					source: data.ocs.data.extracted.source,
-					root: data.ocs.data.extracted.root,
-					owner: data.ocs.data.extracted.owner,
-					permissions: data.ocs.data.extracted.permissions,
-					mtime: new Date(time),
-					attributes: {
-						'mount-type': data.ocs.data.extracted['mount-type'],
-						'owner-id': data.ocs.data.extracted.owner,
-						'owner-display-name': data.ocs.data.extracted['owner-display-name'],
-					},
-				})
-
-				emit('files:node:created', folder)
-
-				window.OCP.Files.Router.goToRoute(
-					{ view: 'files', fileid: data.fileId },
-					{ dir },
-				)
-				return null
-			})
-			.catch((error) => {
-				console.log('Could not send extract request.')
-				console.log(error)
-			})
-		return null
-	},
-
+	enabled: isEnabled,
+	exec,
 	order: 25,
-})
+}
+
+/**
+ * Register the "Extract here" file action.
+ */
+// skipcq: JS-0067
+export function registerExtractAction(): void {
+	registerFileAction(extractAction)
+}
