@@ -11,8 +11,8 @@ name: Npm audit fix and compile
 on:
   workflow_dispatch:
   schedule:
-    # At 2:30 on Sundays
-    - cron: '30 2 * * 0'
+    # At 22:30 on Saturdays
+    - cron: '30 22 * * 6'
 
 permissions:
   contents: read
@@ -74,8 +74,8 @@ jobs:
         if: steps.checkout.outcome == 'success'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: ${{ vars.LIBRECODE_WORKFLOW_APP_CLIENT_ID }}
-          private-key: ${{ secrets.LIBRECODE_WORKFLOW_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.WORKFLOW_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.WORKFLOW_SYNC_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
           permission-contents: write
@@ -95,4 +95,3 @@ jobs:
           body: ${{ steps.npm-audit.outputs.markdown }}
           labels: |
             dependencies
-            3. to review
