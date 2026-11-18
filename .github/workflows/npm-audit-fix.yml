@@ -11,8 +11,8 @@ name: Npm audit fix and compile
 on:
   workflow_dispatch:
   schedule:
-    # At 22:30 on Saturdays
-    - cron: '30 22 * * 6'
+    # At 2:30 on Sundays
+    - cron: '30 2 * * 0'
 
 permissions:
   contents: read
@@ -95,3 +95,4 @@ jobs:
           body: ${{ steps.npm-audit.outputs.markdown }}
           labels: |
             dependencies
+            3. to review
