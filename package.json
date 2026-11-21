@@ -11,12 +11,14 @@
     "fs": false
   },
   "scripts": {
+    "prebuild": "npm run test:unit",
     "build": "vite build --mode production",
     "dev": "vite build --mode development",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "stylelint": "stylelint src/**/*.scss src/**/*.css --allow-empty-input",
     "stylelint:fix": "src/**/*.scss src/**/*.css --fix",
+    "test:unit": "node --test tests/javascript/*.test.mjs",
     "typescript:check": "tsc --noEmit",
     "typescript:generate": "npx openapi-typescript ./openapi.json -t -o src/types/openapi/openapi.ts",
     "watch": "vite build --mode development --watch"
@@ -39,7 +41,7 @@
     "@nextcloud/logger": "^3.0.3",
     "@nextcloud/router": "^3.1.0",
     "@nextcloud/vue": "9.14.1",
-    "vue": "3.5.24"
+    "vue": "3.5.46"
   },
   "devDependencies": {
     "@nextcloud/browserslist-config": "^3.1.2",

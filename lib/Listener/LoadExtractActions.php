@@ -26,6 +26,7 @@ final class LoadExtractActions implements IEventListener {
 		}
 
 		Util::addScript(Application::APP_ID, 'extract-main');
-		Util::addStyle(Application::APP_ID, 'style');
+		// Vite extracts the NcDialog/NcTextField styles into extract-main.css.
+		Util::addStyle(Application::APP_ID, 'extract-main');
 	}
 }

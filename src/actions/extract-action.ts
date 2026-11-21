@@ -13,6 +13,7 @@ import { translate as t } from '@nextcloud/l10n'
 import { generateOcsUrl } from '@nextcloud/router'
 import { createApp } from 'vue'
 import ExtractionDialog from '../components/ExtractionDialog.vue'
+import { destinationParentPath, suggestedDestinationName } from './extraction-utils.ts'
 
 /**
  * MIME types the backend can extract.
@@ -162,25 +163,6 @@ function buildRequestBody(node: INode, folder: IFolder, targetDirName: string) {
 }
 
 /**
- * Suggest a destination while preserving extensions inside the archive's name.
- *
- * Match the server's resultFolderName logic for wrapped tarballs and .tar;
- * files like backup.2026.zip must retain their middle extension.
- *
- * @param fileName Name of the archive
- */
-function suggestedDestinationName(fileName: string): string {
-	const lower = fileName.toLowerCase()
-	for (const extension of ['tar.gz', 'tgz', 'tar.bz2', 'tbz', 'tbz2', 'tar.xz', 'txz', 'tar']) {
-		if (lower.endsWith('.' + extension)) {
-			return fileName.slice(0, -(extension.length + 1))
-		}
-	}
-	const dot = fileName.lastIndexOf('.')
-	return dot < 0 ? fileName : fileName.slice(0, dot)
-}
-
-/**
  * Display a native Nextcloud dialog and return the confirmed relative path.
  *
  * A cancelled dialog must resolve to null, not trigger the Files error toast.
@@ -219,7 +201,8 @@ function isEnabled(context: ActionContext): boolean {
 	const [node] = context.nodes
 	return node !== undefined
 		&& isSupportedArchive(node)
-		&& (node.permissions & Permission.UPDATE) !== 0
+		&& (node.permissions & Permission.READ) !== 0
+		&& (context.folder.permissions & Permission.CREATE) !== 0
 }
 
 /**
@@ -256,7 +239,7 @@ async function exec(context: ActionContextSingle): Promise<boolean | null> {
 	window.OCP.Files.Router.goToRoute(
 		null,
 		{ view: 'files', fileid: String(extracted.fileId) },
-		{ dir: context.folder.path },
+		{ dir: destinationParentPath(context.folder.path, targetDirName) },
 	)
 
 	return null
@@ -272,7 +255,7 @@ export const extractAction: IFileAction = {
 }
 
 /**
- * Register the "Extract here" file action.
+ * Register the extraction file action.
  */
 // skipcq: JS-0067
 export function registerExtractAction(): void {
