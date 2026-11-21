@@ -9,6 +9,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2.0.0 - 2025-10-07
+
+### Added
+
+- Implement php-cs-fixer CI [#118](https://github.com/LibreCodeCoop/extract/pull/118)
+- Configure psalm CI [#121](https://github.com/LibreCodeCoop/extract/pull/121)
+- Add .editorconfig [#122](https://github.com/LibreCodeCoop/extract/pull/122)
+- Implement openapi [#123](https://github.com/LibreCodeCoop/extract/pull/123)
+- Implement dependabot approve merge action [#128](https://github.com/LibreCodeCoop/extract/pull/128)
+- Implement lint php action [#131](https://github.com/LibreCodeCoop/extract/pull/131)
+- Implement block unconventional commits action [#127](https://github.com/LibreCodeCoop/extract/pull/127)
+- Implement lint info xml action [#130](https://github.com/LibreCodeCoop/extract/pull/130)
+- Implement lint eslint action [#129](https://github.com/LibreCodeCoop/extract/pull/129)
+- Implement lint stylelint action [#132](https://github.com/LibreCodeCoop/extract/pull/132)
+- Implement node action [#133](https://github.com/LibreCodeCoop/extract/pull/133)
+- Implement npm audit fix action [#134](https://github.com/LibreCodeCoop/extract/pull/134)
+- Nextcloud version 32 support [#117](https://github.com/LibreCodeCoop/extract/pull/117)
+
+### Changed
+
+- Indent some files as project pattern [#124](https://github.com/LibreCodeCoop/extract/pull/124)
+- Reorganize frontend [#125](https://github.com/LibreCodeCoop/extract/pull/125)
+- Implement property promotion on constructors [#126](https://github.com/LibreCodeCoop/extract/pull/126)
+
+### Fixed
+
+- Remove unused deps and files [#120](https://github.com/LibreCodeCoop/extract/pull/120)
+- Fix Psalm errors [#126](https://github.com/LibreCodeCoop/extract/pull/126)
+
+## 1.4.0 - 2025-10-07
+
+### Added
+
+- Implement php-cs-fixer CI [#118](https://github.com/LibreCodeCoop/extract/pull/118)
+- Configure psalm CI [#121](https://github.com/LibreCodeCoop/extract/pull/121)
+- Add .editorconfig [#122](https://github.com/LibreCodeCoop/extract/pull/122)
+- Implement openapi [#123](https://github.com/LibreCodeCoop/extract/pull/123)
+- Implement dependabot approve merge action [#128](https://github.com/LibreCodeCoop/extract/pull/128)
+- Implement lint php action [#131](https://github.com/LibreCodeCoop/extract/pull/131)
+- Implement block unconventional commits action [#127](https://github.com/LibreCodeCoop/extract/pull/127)
+- Implement lint info xml action [#130](https://github.com/LibreCodeCoop/extract/pull/130)
+- Implement lint eslint action [#129](https://github.com/LibreCodeCoop/extract/pull/129)
+- Implement lint stylelint action [#132](https://github.com/LibreCodeCoop/extract/pull/132)
+- Implement node action [#133](https://github.com/LibreCodeCoop/extract/pull/133)
+- Implement npm audit fix action [#134](https://github.com/LibreCodeCoop/extract/pull/134)
+- Nextcloud version 31 support [#117](https://github.com/LibreCodeCoop/extract/pull/117)
+
+### Changed
+
+- Indent some files as project pattern [#124](https://github.com/LibreCodeCoop/extract/pull/124)
+- Reorganize frontend [#125](https://github.com/LibreCodeCoop/extract/pull/125)
+- Implement property promotion on constructors [#126](https://github.com/LibreCodeCoop/extract/pull/126)
+
+### Fixed
+
+- Remove unused deps and files [#120](https://github.com/LibreCodeCoop/extract/pull/120)
+- Fix Psalm errors [#126](https://github.com/LibreCodeCoop/extract/pull/126)
+
 ## 1.3.6
 
 - NC27 support
