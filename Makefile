@@ -120,6 +120,10 @@ source:
 # built frontend lives in js/ and is produced by `make build` beforehand.
 .PHONY: appstore
 appstore:
+	@test -s js/extract-main.mjs && test -s css/extract-main.css || { \
+		echo "ERROR: Compile the frontend with npm run build before packaging"; \
+		exit 1; \
+	}
 	rm -rf $(app_dir) $(appstore_build_directory)/$(app_id).tar.gz $(appstore_build_directory)/$(app_id).zip
 	mkdir -p $(app_dir)
 	rsync -a \
@@ -131,6 +135,11 @@ appstore:
 	--exclude='node_modules' \
 	--exclude='src' \
 	--exclude='tests' \
+	--exclude='docs' \
+	--exclude='scripts' \
+	--exclude='playwright-report' \
+	--exclude='test-results' \
+	--exclude='playwright.config.ts' \
 	--exclude='vendor' \
 	--exclude='vendor-bin' \
 	--exclude='LICENSES' \
@@ -178,3 +187,22 @@ check-version:
 	exit 1;\
 	fi
 
+
+
+# Validate the exact release artifact, not just the staged directory.
+.PHONY: verify-appstore-package
+verify-appstore-package:
+	@set -eu; \
+	artifact="$(appstore_build_directory)/$(app_id).tar.gz"; \
+	test -s "$$artifact" || { echo "ERROR: Missing release archive"; exit 1; }; \
+	for item in appinfo/info.xml lib/Controller/ExtractionController.php js/extract-main.mjs css/extract-main.css COPYING; do \
+		tar -tzf "$$artifact" | grep -Fxq "$(app_id)/$$item" || { echo "ERROR: Missing packaged $$item"; exit 1; }; \
+	done; \
+	if tar -tzf "$$artifact" | grep -Eq '^$(app_id)/(\.git|\.github|src|tests|vendor|vendor-bin|node_modules|build|docs)(/|$$)'; then \
+		echo "ERROR: Development files found in release package"; exit 1; \
+	fi; \
+	version=$$(sed -n 's@.*<version>\([^<]*\)</version>.*@\1@p' appinfo/info.xml | head -1); \
+	tar -xOzf "$$artifact" "$(app_id)/appinfo/info.xml" | grep -Fq "<version>$$version</version>" || { \
+		echo "ERROR: Package version differs from source"; exit 1; \
+	}; \
+	echo "Validated $(app_id) $$version release artifact: $$artifact"

@@ -17,9 +17,9 @@ use ZipArchive;
 
 final class ExtractionPathSafetyTest extends TestCase {
 	private function service(): ExtractionService {
-		$l10n = $this->createMock(IL10N::class);
+		$l10n = $this->createStub(IL10N::class);
 		$l10n->method('t')->willReturnCallback(static fn (string $s): string => $s);
-		return new ExtractionService($l10n, $this->createMock(LoggerInterface::class));
+		return new ExtractionService($l10n, $this->createStub(LoggerInterface::class));
 	}
 
 	public function testUnsafeArchiveEntryNamesAreRejected(): void {

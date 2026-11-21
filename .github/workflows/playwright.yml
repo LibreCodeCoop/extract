@@ -1,0 +1,144 @@
+# SPDX-FileCopyrightText: 2026 LibreCode coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: Nextcloud Playwright integration
+
+on:
+  pull_request:
+    branches: [main, stable33, stable34, stable35]
+  push:
+    branches: [main, stable33, stable34, stable35]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extract-playwright-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  versions:
+    name: Select supported Nextcloud majors
+    runs-on: ubuntu-latest
+    outputs:
+      majors: ${{ steps.select.outputs.majors }}
+    steps:
+      - id: select
+        env:
+          RELEASE_BRANCH: ${{ github.base_ref || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$RELEASE_BRANCH" in
+            main) majors='[33,34,35]' ;;
+            stable33) majors='[33]' ;;
+            stable34) majors='[34]' ;;
+            stable35) majors='[35]' ;;
+            *)
+              echo "::error::Unsupported release branch $RELEASE_BRANCH"
+              exit 1 ;;
+          esac
+          echo "majors=$majors" >> "$GITHUB_OUTPUT"
+
+  playwright:
+    needs: versions
+    name: Nextcloud ${{ matrix.nextcloud }} browser and API
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        nextcloud: ${{ fromJSON(needs.versions.outputs.majors) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Install and compile application
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run lint
+          npm run typescript:check
+          npm run build
+      - name: Prepare disposable test credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          password="$(openssl rand -hex 24)"
+          echo "::add-mask::$password"
+          printf 'NEXTCLOUD_ADMIN_PASSWORD=%s\n' "$password" >> "$GITHUB_ENV"
+      - name: Start disposable Nextcloud
+        shell: bash
+        env:
+          NC_MAJOR: ${{ matrix.nextcloud }}
+        run: |
+          set -euo pipefail
+          docker run --rm -d --name extract-playwright-nextcloud \
+            -p 127.0.0.1:18135:80 \
+            -v "$PWD:/var/www/html/custom_apps/extract:ro" \
+            "nextcloud:$NC_MAJOR-apache"
+          ready=false
+          for i in $(seq 1 90); do
+            if curl --silent --fail http://127.0.0.1:18135/status.php >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          test "$ready" = true || { echo "::error::Nextcloud did not start"; exit 1; }
+          docker exec -u www-data extract-playwright-nextcloud php /var/www/html/occ \
+            maintenance:install --database sqlite --database-name nextcloud \
+            --admin-user e2e --admin-pass "$NEXTCLOUD_ADMIN_PASSWORD"
+          docker exec -u www-data extract-playwright-nextcloud php /var/www/html/occ app:enable extract
+          # The first-run wizard overlays the Files action menu on fresh NC
+          # installations; disable it only within this disposable test instance.
+          docker exec -u www-data extract-playwright-nextcloud php /var/www/html/occ app:disable firstrunwizard
+          actual="$(docker exec -u www-data extract-playwright-nextcloud php /var/www/html/occ \
+            status --output=json | jq -r '.versionstring' | cut -d. -f1)"
+          test "$actual" = "$NC_MAJOR" || {
+            echo "::error::Expected Nextcloud $NC_MAJOR, got $actual"
+            exit 1
+          }
+      - name: Run real Nextcloud Playwright tests
+        env:
+          CI: '1'
+          NC_ADMIN_USER: e2e
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:18135
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run playwright
+      - name: Save failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: extract-playwright-nc${{ matrix.nextcloud }}
+          path: |
+            test-results
+            playwright-report
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Remove disposable Nextcloud
+        if: always()
+        run: docker rm -f extract-playwright-nextcloud || true
+
+  summary:
+    name: playwright-summary
+    needs: [versions, playwright]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm every required version passed
+        shell: bash
+        env:
+          VERSIONS_RESULT: ${{ needs.versions.result }}
+          PLAYWRIGHT_RESULT: ${{ needs.playwright.result }}
+        run: |
+          test "$VERSIONS_RESULT" = success
+          test "$PLAYWRIGHT_RESULT" = success
