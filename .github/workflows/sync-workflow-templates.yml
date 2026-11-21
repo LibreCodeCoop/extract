@@ -148,7 +148,7 @@ jobs:
           source: source/workflow-templates
           target: target
           catalog-commit: ${{ steps.catalog-revision.outputs.sha }}
-          include: npm-audit-fix.yml
+          include: npm-audit-fix.yml,block-unconventional-commits.yml,lint-info-xml.yml,reuse.yml
 
       - name: Create Pull Request
         if: ${{ steps.sync.outputs.changed == 'true' }}
