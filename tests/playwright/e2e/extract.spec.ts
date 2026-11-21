@@ -8,6 +8,7 @@ import type { APIRequestContext } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 
 const user = process.env.NC_ADMIN_USER ?? 'e2e'
 const password = process.env.NEXTCLOUD_ADMIN_PASSWORD
@@ -24,8 +25,12 @@ const apiHeaders = {
 const extractEndpoint = '/ocs/v2.php/apps/extract/api/v1/extraction/execute?format=json'
 
 /** DAV operations run only against the disposable user configured for CI. */
+function davFor(username: string, path: string): string {
+	return '/remote.php/dav/files/' + encodeURIComponent(username) + '/' + path.split('/').map(encodeURIComponent).join('/')
+}
+
 function dav(path: string): string {
-	return '/remote.php/dav/files/' + encodeURIComponent(user) + '/' + path.split('/').map(encodeURIComponent).join('/')
+	return davFor(user, path)
 }
 
 /** Upload a small synthetic ZIP into the disposable Nextcloud installation. */
@@ -162,5 +167,122 @@ test('Files action validates, cancels and confirms extraction destinations', asy
 		expect(extractionRequests).toHaveLength(1)
 	} finally {
 		await deleteFile(request, dir)
+	}
+})
+
+
+/**
+ * Integration coverage for the 7za path, which the default Nextcloud image
+ * cannot exercise unless the binary is installed in its disposable container.
+ */
+test('OCS extracts a real 7z archive on Nextcloud', async ({ request }) => {
+	const name = 'extract-e2e-' + randomUUID().slice(0, 8) + '.7z'
+	const destination = 'extract-7z-' + randomUUID().slice(0, 8)
+	const archive = await readFile(new URL('../../Fixtures/valid.7z', import.meta.url))
+	try {
+		const uploaded = await request.put(dav(name), {
+			headers: { Authorization: authorization, 'Content-Type': 'application/x-7z-compressed' },
+			data: archive,
+		})
+		expect(uploaded.status()).toBe(201)
+		const response = await request.post(extractEndpoint, {
+			headers: apiHeaders,
+			data: {
+				nameOfFile: name,
+				directory: '/',
+				external: false,
+				mime: 'application/x-7z-compressed',
+				targetDirName: destination,
+			},
+		})
+		expect(response.ok()).toBeTruthy()
+		const result = await response.json()
+		expect(result.ocs.data.code).toBe(1)
+		const extracted = await request.get(dav(destination + '/hello.txt'), {
+			headers: { Authorization: authorization },
+		})
+		expect(extracted.status()).toBe(200)
+		expect(await extracted.text()).toBe('hello world\n')
+	} finally {
+		await deleteFile(request, name)
+		await deleteFile(request, destination)
+	}
+})
+
+/**
+ * A recipient writing to a shared directory must extract into that recipient's
+ * own Files view, not into an invisible or owner-only folder. Create everything
+ * inside disposable CI Nextcloud; never touch real accounts or data.
+ */
+test('A share recipient can extract a ZIP to a writable shared folder', async ({ request }) => {
+	const recipient = 'extractci' + randomUUID().replaceAll('-', '').slice(0, 12)
+	const recipientPassword = 'ExtractCI!' + randomUUID().replaceAll('-', '')
+	const recipientAuthorization = 'Basic ' + Buffer.from(recipient + ':' + recipientPassword).toString('base64')
+	const dir = 'extract-shared-' + randomUUID().slice(0, 8)
+	const archiveName = 'uploaded-by-recipient.zip'
+	let userCreated = false
+	let folderCreated = false
+
+	try {
+		const newUser = await request.post('/ocs/v2.php/cloud/users?format=json', {
+			headers: apiHeaders,
+			form: { userid: recipient, password: recipientPassword },
+		})
+		userCreated = newUser.ok()
+		expect(newUser.ok()).toBeTruthy()
+		const newUserData = await newUser.json()
+		expect([100, 200]).toContain(newUserData.ocs.meta.statuscode)
+
+		const created = await request.fetch(dav(dir), {
+			method: 'MKCOL',
+			headers: { Authorization: authorization },
+		})
+		folderCreated = created.status() === 201
+		expect(folderCreated).toBeTruthy()
+
+		const share = await request.post('/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json', {
+			headers: apiHeaders,
+			form: { path: '/' + dir, shareType: '0', shareWith: recipient, permissions: '31' },
+		})
+		expect(share.ok()).toBeTruthy()
+		const shareData = await share.json()
+		expect([100, 200]).toContain(shareData.ocs.meta.statuscode)
+
+		const uploaded = await request.put(davFor(recipient, dir + '/' + archiveName), {
+			headers: { Authorization: recipientAuthorization, 'Content-Type': 'application/zip' },
+			data: fixture,
+		})
+		expect(uploaded.status()).toBe(201)
+
+		const response = await request.post(extractEndpoint, {
+			headers: { ...apiHeaders, Authorization: recipientAuthorization },
+			data: {
+				nameOfFile: archiveName,
+				directory: '/' + dir,
+				external: false,
+				mime: 'application/zip',
+				targetDirName: 'recipient-extracted',
+			},
+		})
+		expect(response.ok()).toBeTruthy()
+		const result = await response.json()
+		expect(result.ocs.data.code).toBe(1)
+
+		for (const [account, auth] of [[recipient, recipientAuthorization], [user, authorization]]) {
+			const extracted = await request.get(davFor(account, dir + '/recipient-extracted/hello.txt'), {
+				headers: { Authorization: auth },
+			})
+			expect(extracted.status()).toBe(200)
+			expect(await extracted.text()).toBe('Extract browser E2E passed\n')
+		}
+	} finally {
+		if (folderCreated) {
+			await deleteFile(request, dir)
+		}
+		if (userCreated) {
+			await request.delete('/ocs/v2.php/cloud/users/' + encodeURIComponent(recipient) + '?format=json', {
+				headers: apiHeaders,
+			})
+		}
 	}
 })
