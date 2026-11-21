@@ -76,14 +76,38 @@ final class ExtractionService {
 	}
 
 	/** @return null|array{code: 0, desc: string} */
-	private function assertSafe7z(string $file, bool $useFullSevenZip = false): ?array {
+	private function assertSafe7z(string $file): ?array {
 		$output = [];
 		$return = 0;
-		$binary = $useFullSevenZip ? '7z' : '7za';
-		exec($binary . ' l -ba -slt ' . escapeshellarg($file) . ' 2>&1', $output, $return);
+		exec('7za l -ba -slt ' . escapeshellarg($file) . ' 2>&1', $output, $return);
 		if ($return !== 0) {
-			$this->logger->error($binary . ' list failed (rc=' . $return . '): ' . implode("\n", $output));
+			$this->logger->error('7za list failed (rc=' . $return . '): ' . implode("\n", $output));
 			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect archive contents')];
+		}
+		foreach ($output as $line) {
+			if (str_starts_with($line, 'Path = ')) {
+				if ($error = $this->rejectUnsafe(substr($line, 7))) {
+					return $error;
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Inspect RAR paths with the full 7z binary before extraction. Keeping the
+	 * RAR listing separate from 7za allows the two formats to use different
+	 * capabilities, and keeps additional 7za metadata checks independent.
+	 *
+	 * @return null|array{code: 0, desc: string}
+	 */
+	private function assertSafeRarSevenZip(string $file): ?array {
+		$output = [];
+		$return = 0;
+		exec('7z l -ba -slt ' . escapeshellarg($file) . ' 2>&1', $output, $return);
+		if ($return !== 0) {
+			$this->logger->error('7z RAR listing failed (rc=' . $return . '): ' . implode("\n", $output));
+			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
 		}
 		foreach ($output as $line) {
 			if (str_starts_with($line, 'Path = ')) {
@@ -103,7 +127,7 @@ final class ExtractionService {
 		if (!$this->isCommandAvailable('7z')) {
 			return ['code' => 0, 'desc' => $this->l->t('RAR extraction requires unrar, the PHP rar extension, or the full 7z binary')];
 		}
-		if ($error = $this->assertSafe7z($file, true)) {
+		if ($error = $this->assertSafeRarSevenZip($file)) {
 			return $error;
 		}
 		$output = [];
