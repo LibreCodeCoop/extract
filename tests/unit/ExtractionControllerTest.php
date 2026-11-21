@@ -15,6 +15,7 @@ use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IFilenameValidator;
 use OCP\Files\IRootFolder;
+use OCP\Files\NotPermittedException;
 use OCP\Files\Storage\IStorage;
 use OCP\IL10N;
 use OCP\IRequest;
@@ -179,7 +180,10 @@ final class ExtractionControllerTest extends TestCase {
 		$node->method('getInternalPath')->willReturn('files/archive.zip');
 
 		$userFolder = $this->createMock(Folder::class);
-		$userFolder->method('get')->willReturn($node);
+		$userFolder->method('get')->willReturnCallback(
+			static fn (string $path) => $path === '/' ? $userFolder : $node,
+		);
+		$userFolder->method('isCreatable')->willReturn(true);
 
 		$rootFolder = $this->createMock(IRootFolder::class);
 		$rootFolder->method('getUserFolder')->willReturn($userFolder);
@@ -228,9 +232,9 @@ final class ExtractionControllerTest extends TestCase {
 	}
 
 	/**
-	 * Ordinary local storage keeps unpacking beside the archive.
+	 * Ordinary local storage must also stage archives outside the data directory.
 	 */
-	public function testExecuteAllowsLocalStorage(): void {
+	public function testExecuteStagesLocalStorageBeforeImport(): void {
 		$storage = $this->createMock(IStorage::class);
 		$storage->method('isLocal')->willReturn(true);
 
@@ -242,7 +246,10 @@ final class ExtractionControllerTest extends TestCase {
 		$node->method('getInternalPath')->willReturn('files/archive.zip');
 
 		$userFolder = $this->createMock(Folder::class);
-		$userFolder->method('get')->willReturn($node);
+		$userFolder->method('get')->willReturnCallback(
+			static fn (string $path) => $path === '/' ? $userFolder : $node,
+		);
+		$userFolder->method('isCreatable')->willReturn(true);
 
 		$rootFolder = $this->createMock(IRootFolder::class);
 		$rootFolder->method('getUserFolder')->willReturn($userFolder);
@@ -252,9 +259,14 @@ final class ExtractionControllerTest extends TestCase {
 			static fn (string $text, $parameters = []): string => $text,
 		);
 
-		// The scratch directory must not be requested on local storage.
+		$scratch = sys_get_temp_dir() . '/extract-local-scratch-' . bin2hex(random_bytes(6));
 		$tempManager = $this->createMock(ITempManager::class);
-		$tempManager->expects(self::never())->method('getTemporaryFolder');
+		$tempManager->expects(self::once())->method('getTemporaryFolder')->willReturnCallback(
+			static function () use ($scratch): string {
+				mkdir($scratch, 0700, true);
+				return $scratch;
+			},
+		);
 
 		// A real service instance. The archive path does not exist, so
 		// extractZip() reports "Cannot open Zip file" — reaching it proves the
@@ -278,6 +290,72 @@ final class ExtractionControllerTest extends TestCase {
 		$data = $response->getData();
 		self::assertSame(0, $data['code']);
 		self::assertSame('Cannot open Zip file', $data['desc']);
+		self::assertDirectoryDoesNotExist($scratch);
+	}
+
+	/**
+	 * A read-only folder must be rejected before the extractor can write files.
+	 */
+	public function testExecuteRejectsReadOnlyDestination(): void {
+		$node = $this->createMock(File::class);
+		$userFolder = $this->createMock(Folder::class);
+		$userFolder->method('get')->willReturnCallback(
+			static fn (string $path) => $path === '/' ? $userFolder : $node,
+		);
+		$userFolder->method('isCreatable')->willReturn(false);
+
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder->method('getUserFolder')->willReturn($userFolder);
+		$l10n = $this->createMock(IL10N::class);
+		$l10n->method('t')->willReturnCallback(
+			static fn (string $text, $parameters = []): string => $text,
+		);
+
+		$tempManager = $this->createMock(ITempManager::class);
+		$tempManager->expects(self::never())->method('getTemporaryFolder');
+
+		$controller = new ExtractionController(
+			'extract',
+			$this->createMock(IRequest::class),
+			new ExtractionService($l10n, $this->createMock(LoggerInterface::class)),
+			$rootFolder,
+			$l10n,
+			$this->createMock(LoggerInterface::class),
+			'user',
+			$this->createMock(IURLGenerator::class),
+			$this->createMock(IFilenameValidator::class),
+			$tempManager,
+		);
+
+		$data = $controller->execute('archive.zip', '/', false, 'application/zip')->getData();
+		self::assertSame(0, $data['code']);
+		self::assertSame('You do not have permission to extract here', $data['desc']);
+	}
+
+	/**
+	 * A symlink must never be read and published as the target file's contents.
+	 */
+	public function testRejectsLinksInStagedArchivesBeforeImport(): void {
+		$source = sys_get_temp_dir() . '/extract-link-' . bin2hex(random_bytes(6));
+		$outside = sys_get_temp_dir() . '/extract-outside-' . bin2hex(random_bytes(6));
+		mkdir($source, 0700, true);
+		file_put_contents($source . '/normal.txt', 'safe');
+		file_put_contents($outside, 'outside data');
+
+		$reflection = new \ReflectionClass(ExtractionController::class);
+		$controller = $reflection->newInstanceWithoutConstructor();
+		$method = new \ReflectionMethod(ExtractionController::class, 'assertNoSymbolicLinks');
+		try {
+			$method->invoke($controller, $source);
+			if (symlink($outside, $source . '/alias.txt') === false) {
+				self::markTestSkipped('The platform cannot create symbolic links');
+			}
+			$this->expectException(NotPermittedException::class);
+			$method->invoke($controller, $source);
+		} finally {
+			$this->removeDirectory($source);
+			unlink($outside);
+		}
 	}
 
 	/**
