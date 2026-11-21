@@ -39,7 +39,7 @@ the archive directory.
 | Tool | Purpose | Install |
 |------|---------|---------|
 | PHP `zip` extension | Zip archives | bundled with most PHP builds |
-| PHP `rar` extension **or** `unrar` | Rar archives | `pecl install rar` **or** `apt-get install unrar` |
+| PHP `rar`, `unrar` **or** full `7z` | Rar archives | `pecl install rar` **or** `apt-get install unrar` **or** `apt-get install 7zip` |
 | `p7zip` / `p7zip-full` | Tar, Gzip, Bzip2, 7z, Deb | `apt-get install p7zip p7zip-full` |
 
 Extraction needs enough free space in the server's temporary directory for the
@@ -163,13 +163,18 @@ user data.
 | Format | Extensions | Extraction backend |
 |--------|------------|--------------------|
 | Zip | `.zip` | PHP `zip` extension |
-| Rar | `.rar` | PHP `rar` extension or `unrar` |
+| Rar | `.rar` | PHP `rar` extension, `unrar`, or full `7z` fallback |
 | Tar | `.tar` | `7za` |
 | Tar + Gzip | `.tar.gz`, `.tgz` | `7za` |
 | Tar + Bzip2 | `.tar.bz2`, `.tbz2` | `7za` |
 | Gzip | `.gz` | `7za` |
 | 7z | `.7z` | `7za` |
 | Deb | `.deb` | `7za` |
+
+On systems without the PHP `rar` extension or `unrar`, the full `7z`
+executable can extract supported RAR archives as an additional fallback.
+The smaller `7za` executable does not necessarily support RAR; on Debian 13,
+install the `7zip` package to obtain the full decoder.
 
 > **Note:** Archives protected by a password are not supported. Extraction works
 > on a normal Nextcloud data directory, on object storage and with server-side

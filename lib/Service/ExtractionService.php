@@ -266,6 +266,9 @@ final class ExtractionService {
 		$response = [];
 
 		if (!extension_loaded('rar')) {
+			if (!$this->isCommandAvailable('unrar')) {
+				return $this->extractRarWithSevenZip($file, $extractTo);
+			}
 			if ($error = $this->assertSafeRarShell($file)) {
 				return $error;
 			}
@@ -345,4 +348,61 @@ final class ExtractionService {
 		$response = array_merge($response, ['code' => 1]);
 		return $response;
 	}
+
+	/**
+	 * Inspect RAR paths with the full 7z binary before extraction. Keeping the
+	 * RAR listing separate from 7za allows the two formats to use different
+	 * capabilities, and keeps additional 7za metadata checks independent.
+	 *
+	 * @return null|array{code: 0, desc: string}
+	 */
+	private function assertSafeRarSevenZip(string $file): ?array {
+		$output = [];
+		$return = 0;
+		exec('7z l -ba -slt ' . escapeshellarg($file) . ' 2>&1', $output, $return);
+		if ($return !== 0) {
+			$this->logger->error('7z RAR listing failed (rc=' . $return . '): ' . implode("\n", $output));
+			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
+		}
+		foreach ($output as $line) {
+			if (str_starts_with($line, 'Path = ')) {
+				if ($error = $this->rejectUnsafe(substr($line, 7))) {
+					return $error;
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Use the full 7z binary as an alternate RAR decoder on distributions that
+	 * cannot install the unrar command or the PHP rar extension.
+	 */
+	private function extractRarWithSevenZip(string $file, string $extractTo): array {
+		if (!$this->isCommandAvailable('7z')) {
+			return ['code' => 0, 'desc' => $this->l->t('RAR extraction requires unrar, the PHP rar extension, or the full 7z binary')];
+		}
+		if ($error = $this->assertSafeRarSevenZip($file)) {
+			return $error;
+		}
+		$output = [];
+		$return = 0;
+		exec('7z -y x ' . escapeshellarg($file) . ' -o' . escapeshellarg($extractTo) . ' 2>&1', $output, $return);
+		if ($return !== 0) {
+			$this->logger->error('RAR extraction via 7z failed (rc=' . $return . '): ' . implode("\n", $output));
+			return ['code' => 0, 'desc' => $this->l->t('Could not extract RAR archive')];
+		}
+		return ['code' => 1];
+	}
+
+	/**
+	 * Check for a fixed, known external archive utility before invocation.
+	 */
+	private function isCommandAvailable(string $binary): bool {
+		$return = 0;
+		$output = [];
+		exec('command -v ' . escapeshellarg($binary) . ' >/dev/null 2>&1', $output, $return);
+		return $return === 0;
+	}
+
 }
