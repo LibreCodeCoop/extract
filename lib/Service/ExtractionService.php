@@ -154,7 +154,7 @@ final class ExtractionService {
 			$list = rar_list($rar_file);
 			if ($list === false) {
 				rar_close($rar_file);
-			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
+				return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
 			}
 			foreach ($list as $archive_file) {
 				if ($error = $this->rejectUnsafe($archive_file->getName())) {
