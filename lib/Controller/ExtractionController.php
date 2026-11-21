@@ -260,8 +260,25 @@ final class ExtractionController extends AEnvironmentAwareController {
 	 */
 	private function postExtract(string $fileName, string $directory, string $extractTo, bool $rejectExisting = false): void {
 		$this->assertNoSymbolicLinks($extractTo);
-		$this->removeForbiddenFiles($extractTo);
-		$this->importDirectory($extractTo, $this->destinationFolder($directory, $fileName, $rejectExisting));
+		$this->assertValidExtractedNames($extractTo);
+
+		// Only a newly created destination belongs entirely to this operation.
+		// Never delete an existing folder, which legacy clients may merge into.
+		$destinationExisted = $this->userFolder->get($directory)->nodeExists($fileName);
+		$target = $this->destinationFolder($directory, $fileName, $rejectExisting);
+		try {
+			$this->importDirectory($extractTo, $target);
+		} catch (\Throwable $e) {
+			if (!$destinationExisted) {
+				try {
+					$target->delete();
+				} catch (\Throwable $cleanupError) {
+					$this->logger->error('Could not remove a partially imported extraction: ' . $cleanupError->getMessage());
+				}
+			}
+			$this->logger->error('Extraction import failed: ' . $e->getMessage());
+			throw new NotPermittedException('Could not complete extraction');
+		}
 	}
 
 	/**
@@ -284,22 +301,22 @@ final class ExtractionController extends AEnvironmentAwareController {
 	}
 
 	/**
-	 * Delete every extracted file whose name Nextcloud forbids.
+	 * Check every file and directory component before any data is published.
+	 * Silently removing an invalid name can report success for a partial archive,
+	 * which users may mistake for a complete backup extraction.
 	 *
 	 * @param string $directory The local file-system path of the extracted tree.
 	 */
-	private function removeForbiddenFiles(string $directory): void {
-		// SKIP_DOTS matters: without it the iterator yields `.` and `..` for every
-		// directory in the tree, which isFilenameValid() rejects and unlink() then
-		// fails on.
+	private function assertValidExtractedNames(string $directory): void {
 		$iterator = new \RecursiveIteratorIterator(
 			new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+			\RecursiveIteratorIterator::SELF_FIRST,
 		);
-		foreach ($iterator as $file) {
-			/** @var \SplFileInfo $file */
-			if (!$this->filenameValidator->isFilenameValid($file->getBasename())) {
-				$this->logger->warning(__METHOD__ . ': removing blacklisted file: ' . $file->getPathname());
-				unlink($file->getPathname());
+		foreach ($iterator as $entry) {
+			/** @var \SplFileInfo $entry */
+			$name = $entry->getBasename();
+			if (preg_match('//u', $name) !== 1 || !$this->filenameValidator->isFilenameValid($name)) {
+				throw new NotPermittedException('Archive contains filenames that Nextcloud cannot store');
 			}
 		}
 	}
@@ -538,7 +555,10 @@ final class ExtractionController extends AEnvironmentAwareController {
 			$this->postExtract($fileName, $directory, $extractTo, $targetDirName !== null);
 		} catch (NotFoundException|NotPermittedException|InvalidPathException $e) {
 			$this->logger->error(__METHOD__ . ': could not publish the extracted folder: ' . $e->getMessage());
-			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);
+			$description = $e->getMessage() === 'Archive contains filenames that Nextcloud cannot store'
+				? $this->l->t('Archive contains filenames that Nextcloud cannot store')
+				: $this->l->t('Oops something went wrong.');
+			return new DataResponse(['code' => 0, 'desc' => $description]);
 		} finally {
 			if ($scratch !== null) {
 				$this->removeDirectory($scratch);

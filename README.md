@@ -132,6 +132,14 @@ brew install p7zip
 The action is offered for readable archives when you can create files in their
 parent folder. Extraction never modifies the archive itself.
 
+If an archive contains a filename the Nextcloud storage cannot represent
+(including some legacy character encodings), extraction fails explicitly rather
+than discarding those entries and reporting a misleading success. Valid UTF-8
+names are preserved. A newly created target folder is removed if the import
+fails partway through. Legacy clients merging into an existing folder may still
+leave partial changes, since deleting that folder could destroy pre-existing
+user data.
+
 ### Supported formats
 
 | Format | Extensions | Extraction backend |
