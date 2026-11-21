@@ -176,6 +176,41 @@ final class ExtractionServiceTest extends TestCase {
 	}
 
 	/**
+	 * The 7za listing must preflight the declared uncompressed size against
+	 * the same Nextcloud destination quota used for ZIP.
+	 */
+	public function testRejects7zThatExceedsDestinationQuota(): void {
+		if (trim((string)shell_exec('command -v 7za 2>/dev/null')) === '') {
+			self::markTestSkipped('7za is not installed');
+		}
+		$archive = __DIR__ . '/../Fixtures/valid.7z';
+		$out = $this->tmpDir . '/out';
+
+		$response = $this->service->extractOther($archive, $out, 5);
+
+		self::assertSame(0, $response['code']);
+		self::assertSame('Archive exceeds the allowed extraction size', $response['desc']);
+		self::assertDirectoryDoesNotExist($out);
+	}
+
+	/**
+	 * The regular-sized fixture must still extract when the available quota
+	 * covers its declared uncompressed bytes.
+	 */
+	public function testExtracts7zWithinDestinationQuota(): void {
+		if (trim((string)shell_exec('command -v 7za 2>/dev/null')) === '') {
+			self::markTestSkipped('7za is not installed');
+		}
+		$archive = __DIR__ . '/../Fixtures/valid.7z';
+		$out = $this->tmpDir . '/out';
+
+		$response = $this->service->extractOther($archive, $out, 100);
+
+		self::assertSame(['code' => 1], $response);
+		self::assertSame("hello world\n", file_get_contents($out . '/hello.txt'));
+	}
+
+	/**
 	 * A decompression bomb must be refused before staging any files when the
 	 * total uncompressed content cannot fit the user's Nextcloud quota.
 	 */
