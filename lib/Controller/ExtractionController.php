@@ -531,7 +531,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 
 		switch ($type) {
 			case 'zip':
-				$response = $this->extractionService->extractZip($file, $extractTo);
+				$response = $this->extractionService->extractZip($file, $extractTo, $destinationParent->getFreeSpace());
 				break;
 			case 'rar':
 				$response = $this->extractionService->extractRar($file, $extractTo);

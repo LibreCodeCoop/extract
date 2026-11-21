@@ -41,7 +41,7 @@ final class ExtractionServiceTest extends TestCase {
 		);
 		$this->logger = $this->createStub(LoggerInterface::class);
 
-		$this->service = new ExtractionService($this->l10n, $this->logger);
+		$this->service = new ExtractionService($this->l10n, $this->logger, $this->createStub(\OCP\IConfig::class));
 
 		$this->tmpDir = sys_get_temp_dir() . '/extract-test-' . bin2hex(random_bytes(6));
 		if (mkdir($this->tmpDir, 0777, true) === false && is_dir($this->tmpDir) === false) {
@@ -173,6 +173,64 @@ final class ExtractionServiceTest extends TestCase {
 		self::assertSame(['code' => 1], $response);
 		self::assertFileExists($destination . '/hello.txt');
 		self::assertSame("hello world\n", file_get_contents($destination . '/hello.txt'));
+	}
+
+	/**
+	 * A decompression bomb must be refused before staging any files when the
+	 * total uncompressed content cannot fit the user's Nextcloud quota.
+	 */
+	public function testRejectsZipExceedingDestinationQuotaBeforeWriting(): void {
+		$archive = $this->tmpDir . '/too-large.zip';
+		$this->createZip($archive, ['large.txt' => str_repeat('x', 100)]);
+		$out = $this->tmpDir . '/out';
+
+		$response = $this->service->extractZip($archive, $out, 50);
+
+		self::assertSame(0, $response['code']);
+		self::assertSame('Archive exceeds the allowed extraction size', $response['desc']);
+		self::assertDirectoryDoesNotExist($out);
+	}
+
+	/**
+	 * A configurable entry count rejects an archive with excessive file-count
+	 * amplification, without creating the output directory.
+	 */
+	public function testRejectsZipWithTooManyEntries(): void {
+		$archive = $this->tmpDir . '/too-many.zip';
+		$this->createZip($archive, ['first.txt' => 'a', 'second.txt' => 'b']);
+		$config = $this->createStub(\OCP\IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static fn (string $app, string $key, string $default): string => $key === 'max_archive_entries' ? '1' : $default,
+		);
+		$service = new ExtractionService($this->l10n, $this->logger, $config);
+		$out = $this->tmpDir . '/out';
+
+		$response = $service->extractZip($archive, $out);
+
+		self::assertSame(0, $response['code']);
+		self::assertSame('Archive contains too many files', $response['desc']);
+		self::assertDirectoryDoesNotExist($out);
+	}
+
+	/**
+	 * Bounded streaming still preserves UTF-8 paths, nested directories and
+	 * archive contents for legitimate files.
+	 */
+	public function testStreamedZipPreservesUnicodeNames(): void {
+		$archive = $this->tmpDir . '/unicode.zip';
+		$this->createZip($archive, [
+			'Café.txt' => 'cafe',
+			'한국어/전자책.txt' => 'korean',
+			'中文.txt' => 'chinese',
+		]);
+		$out = $this->tmpDir . '/out';
+
+		$response = $this->service->extractZip($archive, $out);
+
+		self::assertSame(['code' => 1], $response);
+		self::assertSame('cafe', file_get_contents($out . '/Café.txt'));
+		self::assertSame('korean', file_get_contents($out . '/한국어/전자책.txt'));
+		self::assertSame('chinese', file_get_contents($out . '/中文.txt'));
 	}
 
 	/**
