@@ -338,6 +338,13 @@ test('A share recipient can extract a ZIP to a writable shared folder', async ({
 		})
 		expect(uploaded.status()).toBe(201)
 
+		// Positive control: the owner must see files uploaded through this share
+		// before testing whether the Extract import updates the owner's view.
+		const ownerArchive = await request.get(dav(dir + '/' + archiveName), {
+			headers: { Authorization: authorization },
+		})
+		expect(ownerArchive.status(), 'Owner should see an ordinary upload in the shared folder').toBe(200)
+
 		const response = await request.post(extractEndpoint, {
 			headers: { ...apiHeaders, Authorization: recipientAuthorization },
 			data: {
@@ -353,10 +360,12 @@ test('A share recipient can extract a ZIP to a writable shared folder', async ({
 		expect(result.ocs.data.code).toBe(1)
 
 		for (const [account, auth] of [[recipient, recipientAuthorization], [user, authorization]]) {
-			const extracted = await request.get(davFor(account, dir + '/recipient-extracted/hello.txt'), {
-				headers: { Authorization: auth },
-			})
-			expect(extracted.status()).toBe(200)
+			const path = davFor(account, dir + '/recipient-extracted/hello.txt')
+			await expect.poll(async () => {
+				const file = await request.get(path, { headers: { Authorization: auth } })
+				return file.status()
+			}, { timeout: 12_000, message: `Extracted file must be visible to ${account}` }).toBe(200)
+			const extracted = await request.get(path, { headers: { Authorization: auth } })
 			expect(await extracted.text()).toBe('Extract browser E2E passed\n')
 		}
 	} finally {
