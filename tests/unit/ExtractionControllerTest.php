@@ -170,31 +170,31 @@ final class ExtractionControllerTest extends TestCase {
 	 * service is reached, which a source-text scan cannot prove.
 	 */
 	public function testExecuteImportsOnNonLocalStorage(): void {
-		$storage = $this->createMock(IStorage::class);
+		$storage = $this->createStub(IStorage::class);
 		$storage->method('isLocal')->willReturn(false);
 		// The storage API supplies a local extraction source even for remote files.
 		$storage->method('getLocalFile')->willReturn('/tmp/extract-test-archive.zip');
 
-		$node = $this->createMock(File::class);
+		$node = $this->createStub(File::class);
 		$node->method('getStorage')->willReturn($storage);
 		$node->method('getInternalPath')->willReturn('files/archive.zip');
 
-		$userFolder = $this->createMock(Folder::class);
+		$userFolder = $this->createStub(Folder::class);
 		$userFolder->method('get')->willReturnCallback(
 			static fn (string $path) => $path === '/' ? $userFolder : $node,
 		);
 		$userFolder->method('isCreatable')->willReturn(true);
 
-		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder = $this->createStub(IRootFolder::class);
 		$rootFolder->method('getUserFolder')->willReturn($userFolder);
 
-		$l10n = $this->createMock(IL10N::class);
+		$l10n = $this->createStub(IL10N::class);
 		$l10n->method('t')->willReturnCallback(
 			static fn (string $text, $parameters = []): string => $text,
 		);
 
 		$scratch = sys_get_temp_dir() . '/extract-scratch-' . bin2hex(random_bytes(6));
-		$tempManager = $this->createMock(ITempManager::class);
+		$tempManager = $this->createStub(ITempManager::class);
 		$tempManager->method('getTemporaryFolder')->willReturnCallback(
 			function () use ($scratch): string {
 				mkdir($scratch, 0700, true);
@@ -205,18 +205,18 @@ final class ExtractionControllerTest extends TestCase {
 		// A real service instance. The archive path does not exist, so extractZip()
 		// reports "Cannot open Zip file" — reaching it proves the non-local storage
 		// no longer refuses the request.
-		$service = new ExtractionService($l10n, $this->createMock(LoggerInterface::class));
+		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class));
 
 		$controller = new ExtractionController(
 			'extract',
-			$this->createMock(IRequest::class),
+			$this->createStub(IRequest::class),
 			$service,
 			$rootFolder,
 			$l10n,
-			$this->createMock(LoggerInterface::class),
+			$this->createStub(LoggerInterface::class),
 			'user',
-			$this->createMock(IURLGenerator::class),
-			$this->createMock(IFilenameValidator::class),
+			$this->createStub(IURLGenerator::class),
+			$this->createStub(IFilenameValidator::class),
 			$tempManager,
 		);
 
@@ -235,26 +235,26 @@ final class ExtractionControllerTest extends TestCase {
 	 * Ordinary local storage must also stage archives outside the data directory.
 	 */
 	public function testExecuteStagesLocalStorageBeforeImport(): void {
-		$storage = $this->createMock(IStorage::class);
+		$storage = $this->createStub(IStorage::class);
 		$storage->method('isLocal')->willReturn(true);
 
 		// The storage API supplies a local extraction source even for remote files.
 		$storage->method('getLocalFile')->willReturn('/tmp/extract-test-archive.zip');
 
-		$node = $this->createMock(File::class);
+		$node = $this->createStub(File::class);
 		$node->method('getStorage')->willReturn($storage);
 		$node->method('getInternalPath')->willReturn('files/archive.zip');
 
-		$userFolder = $this->createMock(Folder::class);
+		$userFolder = $this->createStub(Folder::class);
 		$userFolder->method('get')->willReturnCallback(
 			static fn (string $path) => $path === '/' ? $userFolder : $node,
 		);
 		$userFolder->method('isCreatable')->willReturn(true);
 
-		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder = $this->createStub(IRootFolder::class);
 		$rootFolder->method('getUserFolder')->willReturn($userFolder);
 
-		$l10n = $this->createMock(IL10N::class);
+		$l10n = $this->createStub(IL10N::class);
 		$l10n->method('t')->willReturnCallback(
 			static fn (string $text, $parameters = []): string => $text,
 		);
@@ -271,18 +271,18 @@ final class ExtractionControllerTest extends TestCase {
 		// A real service instance. The archive path does not exist, so
 		// extractZip() reports "Cannot open Zip file" — reaching it proves the
 		// local-storage path let the request through.
-		$service = new ExtractionService($l10n, $this->createMock(LoggerInterface::class));
+		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class));
 
 		$controller = new ExtractionController(
 			'extract',
-			$this->createMock(IRequest::class),
+			$this->createStub(IRequest::class),
 			$service,
 			$rootFolder,
 			$l10n,
-			$this->createMock(LoggerInterface::class),
+			$this->createStub(LoggerInterface::class),
 			'user',
-			$this->createMock(IURLGenerator::class),
-			$this->createMock(IFilenameValidator::class),
+			$this->createStub(IURLGenerator::class),
+			$this->createStub(IFilenameValidator::class),
 			$tempManager,
 		);
 
@@ -297,16 +297,16 @@ final class ExtractionControllerTest extends TestCase {
 	 * A read-only folder must be rejected before the extractor can write files.
 	 */
 	public function testExecuteRejectsReadOnlyDestination(): void {
-		$node = $this->createMock(File::class);
-		$userFolder = $this->createMock(Folder::class);
+		$node = $this->createStub(File::class);
+		$userFolder = $this->createStub(Folder::class);
 		$userFolder->method('get')->willReturnCallback(
 			static fn (string $path) => $path === '/' ? $userFolder : $node,
 		);
 		$userFolder->method('isCreatable')->willReturn(false);
 
-		$rootFolder = $this->createMock(IRootFolder::class);
+		$rootFolder = $this->createStub(IRootFolder::class);
 		$rootFolder->method('getUserFolder')->willReturn($userFolder);
-		$l10n = $this->createMock(IL10N::class);
+		$l10n = $this->createStub(IL10N::class);
 		$l10n->method('t')->willReturnCallback(
 			static fn (string $text, $parameters = []): string => $text,
 		);
@@ -316,14 +316,14 @@ final class ExtractionControllerTest extends TestCase {
 
 		$controller = new ExtractionController(
 			'extract',
-			$this->createMock(IRequest::class),
-			new ExtractionService($l10n, $this->createMock(LoggerInterface::class)),
+			$this->createStub(IRequest::class),
+			new ExtractionService($l10n, $this->createStub(LoggerInterface::class)),
 			$rootFolder,
 			$l10n,
-			$this->createMock(LoggerInterface::class),
+			$this->createStub(LoggerInterface::class),
 			'user',
-			$this->createMock(IURLGenerator::class),
-			$this->createMock(IFilenameValidator::class),
+			$this->createStub(IURLGenerator::class),
+			$this->createStub(IFilenameValidator::class),
 			$tempManager,
 		);
 
@@ -428,18 +428,18 @@ final class ExtractionControllerTest extends TestCase {
 		file_put_contents($source . '/sub/inside.txt', 'nested content');
 
 		$created = [];
-		$target = $this->createMock(Folder::class);
+		$target = $this->createStub(Folder::class);
 		$target->method('newFolder')->willReturnCallback(
 			function (string $path) use (&$created): Folder {
 				$created[] = ['dir', $path];
-				return $this->createMock(Folder::class);
+				return $this->createStub(Folder::class);
 			},
 		);
 		$target->method('newFile')->willReturnCallback(
 			function (string $path, $content) use (&$created) {
 				self::assertIsResource($content);
 				$created[] = ['file', $path, stream_get_contents($content)];
-				return $this->createMock(File::class);
+				return $this->createStub(File::class);
 			},
 		);
 
@@ -476,7 +476,7 @@ final class ExtractionControllerTest extends TestCase {
 		file_put_contents($source . '/.htaccess', 'forbidden');
 		file_put_contents($source . '/sub/.htaccess', 'forbidden');
 
-		$validator = $this->createMock(IFilenameValidator::class);
+		$validator = $this->createStub(IFilenameValidator::class);
 		$validator->method('isFilenameValid')->willReturnCallback(
 			// The real validator rejects `.` and `..` as dot directories, so the
 			// stub must too, otherwise it would hide a walk that visits them.
@@ -486,7 +486,7 @@ final class ExtractionControllerTest extends TestCase {
 		$reflection = new \ReflectionClass(ExtractionController::class);
 		$controller = $reflection->newInstanceWithoutConstructor();
 		$this->setProperty($controller, 'filenameValidator', $validator);
-		$this->setProperty($controller, 'logger', $this->createMock(LoggerInterface::class));
+		$this->setProperty($controller, 'logger', $this->createStub(LoggerInterface::class));
 
 		$method = new \ReflectionMethod(ExtractionController::class, 'removeForbiddenFiles');
 

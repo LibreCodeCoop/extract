@@ -11,14 +11,13 @@ namespace OCA\Extract\Tests\unit;
 
 use OCA\Extract\Capabilities;
 use OCP\App\IAppManager;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Tests for the capabilities the app advertises to clients.
  */
 final class CapabilitiesTest extends TestCase {
-	/** @var IAppManager&MockObject */
+	/** @var IAppManager */
 	private ?IAppManager $appManager = null;
 
 	/**
@@ -26,13 +25,14 @@ final class CapabilitiesTest extends TestCase {
 	 */
 	protected function setUp(): void {
 		parent::setUp();
-		$this->appManager = $this->createMock(IAppManager::class);
+		$this->appManager = $this->createStub(IAppManager::class);
 	}
 
 	/**
 	 * The reported version comes from the app manager.
 	 */
 	public function testGetCapabilitiesExposesTheAppVersion(): void {
+		$this->appManager = $this->createMock(IAppManager::class);
 		$this->appManager->expects(self::once())
 			->method('getAppVersion')
 			->with('extract')

@@ -46,7 +46,7 @@ final class ExtractionDestinationTest extends TestCase {
 	 * Existing explicit targets must be rejected before staging or extraction.
 	 */
 	public function testDuplicateExplicitDestinationDoesNotStartExtraction(): void {
-		$archive = $this->createMock(File::class);
+		$archive = $this->createStub(File::class);
 		$folder = $this->createMock(Folder::class);
 		$folder->method('get')->willReturnCallback(static fn (string $path) => $path === '/' ? $folder : $archive);
 		$folder->method('isCreatable')->willReturn(true);
@@ -87,7 +87,7 @@ final class ExtractionDestinationTest extends TestCase {
 		$tmp = $this->createMock(ITempManager::class);
 		$tmp->expects(self::never())->method('getTemporaryFolder');
 
-		$validator = $this->createMock(IFilenameValidator::class);
+		$validator = $this->createStub(IFilenameValidator::class);
 		$validator->method('isFilenameValid')->willReturnCallback(static fn (string $name): bool => $name !== '.htaccess');
 		$controller = $this->controller($folder, $tmp, $validator);
 		$result = $controller->execute('backup.zip', '/', false, 'application/zip', 'reports/.htaccess')->getData();
@@ -100,16 +100,16 @@ final class ExtractionDestinationTest extends TestCase {
 	 * A request for an existing custom target must not silently merge it.
 	 */
 	public function testDestinationFolderRejectsExistingExplicitTarget(): void {
-		$existing = $this->createMock(Folder::class);
+		$existing = $this->createStub(Folder::class);
 		$existing->method('isCreatable')->willReturn(true);
 		$parent = $this->createMock(Folder::class);
 		$parent->method('isCreatable')->willReturn(true);
-		$parent->method('nodeExists')->with('backup')->willReturn(true);
-		$parent->method('get')->with('backup')->willReturn($existing);
+		$parent->expects(self::exactly(2))->method('nodeExists')->with('backup')->willReturn(true);
+		$parent->expects(self::once())->method('get')->with('backup')->willReturn($existing);
 
-		$root = $this->createMock(Folder::class);
+		$root = $this->createStub(Folder::class);
 		$root->method('get')->willReturn($parent);
-		$controller = $this->controller($root, $this->createMock(ITempManager::class));
+		$controller = $this->controller($root, $this->createStub(ITempManager::class));
 
 		$resolve = new \ReflectionMethod(ExtractionController::class, 'destinationFolder');
 		self::assertSame($existing, $resolve->invoke($controller, '/', 'backup', false));
@@ -122,7 +122,7 @@ final class ExtractionDestinationTest extends TestCase {
 	 * New nested target folders are created only inside the archive's parent.
 	 */
 	public function testCreatesNestedFoldersInArchiveDirectory(): void {
-		$destination = $this->createMock(Folder::class);
+		$destination = $this->createStub(Folder::class);
 		$inner = $this->createMock(Folder::class);
 		$inner->expects(self::once())->method('nodeExists')->with('2026')->willReturn(false);
 		$inner->expects(self::once())->method('newFolder')->with('2026')->willReturn($destination);
@@ -132,9 +132,9 @@ final class ExtractionDestinationTest extends TestCase {
 		$parent->expects(self::once())->method('nodeExists')->with('reports')->willReturn(false);
 		$parent->expects(self::once())->method('newFolder')->with('reports')->willReturn($inner);
 
-		$root = $this->createMock(Folder::class);
+		$root = $this->createStub(Folder::class);
 		$root->method('get')->willReturn($parent);
-		$controller = $this->controller($root, $this->createMock(ITempManager::class));
+		$controller = $this->controller($root, $this->createStub(ITempManager::class));
 
 		$resolve = new \ReflectionMethod(ExtractionController::class, 'destinationFolder');
 		self::assertSame($destination, $resolve->invoke($controller, '/', 'reports/2026', true));
@@ -154,14 +154,14 @@ final class ExtractionDestinationTest extends TestCase {
 		self::assertTrue($zip->addFromString('hello.txt', 'from s3'));
 		self::assertTrue($zip->close());
 
-		$storage = $this->createMock(IStorage::class);
+		$storage = $this->createStub(IStorage::class);
 		$storage->method('isLocal')->willReturn(false);
 		$storage->method('getLocalFile')->willReturn($archive);
-		$archiveNode = $this->createMock(File::class);
+		$archiveNode = $this->createStub(File::class);
 		$archiveNode->method('getStorage')->willReturn($storage);
 		$archiveNode->method('getInternalPath')->willReturn('files/backup.zip');
 
-		$mount = $this->createMock(IMountPoint::class);
+		$mount = $this->createStub(IMountPoint::class);
 		$mount->method('getMountType')->willReturn('external');
 		$destination = $this->createMock(Folder::class);
 		$destination->method('getId')->willReturn(42);
@@ -174,17 +174,17 @@ final class ExtractionDestinationTest extends TestCase {
 				self::assertSame('hello.txt', $name);
 				self::assertIsResource($stream);
 				$written = stream_get_contents($stream);
-				return $this->createMock(File::class);
+				return $this->createStub(File::class);
 			},
 		);
 
 		$year = $this->createMock(Folder::class);
-		$year->method('nodeExists')->with('Q4 #2026')->willReturn(false);
-		$year->method('newFolder')->with('Q4 #2026')->willReturn($destination);
+		$year->expects(self::once())->method('nodeExists')->with('Q4 #2026')->willReturn(false);
+		$year->expects(self::once())->method('newFolder')->with('Q4 #2026')->willReturn($destination);
 		$folder = $this->createMock(Folder::class);
 		$folder->method('isCreatable')->willReturn(true);
 		$folder->method('nodeExists')->willReturn(false);
-		$folder->method('newFolder')->with('reports')->willReturn($year);
+		$folder->expects(self::once())->method('newFolder')->with('reports')->willReturn($year);
 		$folder->method('get')->willReturnCallback(
 			static function (string $path) use ($folder, $archiveNode, $destination) {
 				return match ($path) {
@@ -196,7 +196,7 @@ final class ExtractionDestinationTest extends TestCase {
 			},
 		);
 
-		$temp = $this->createMock(ITempManager::class);
+		$temp = $this->createStub(ITempManager::class);
 		$scratch = $rootDir . '/scratch';
 		$temp->method('getTemporaryFolder')->willReturnCallback(
 			static function () use ($scratch): string {
@@ -204,19 +204,19 @@ final class ExtractionDestinationTest extends TestCase {
 				return $scratch;
 			},
 		);
-		$root = $this->createMock(IRootFolder::class);
+		$root = $this->createStub(IRootFolder::class);
 		$root->method('getUserFolder')->willReturn($folder);
-		$l10n = $this->createMock(IL10N::class);
+		$l10n = $this->createStub(IL10N::class);
 		$l10n->method('t')->willReturnCallback(static fn (string $text, $parameters = []): string => $text);
-		$logger = $this->createMock(LoggerInterface::class);
-		$validator = $this->createMock(IFilenameValidator::class);
+		$logger = $this->createStub(LoggerInterface::class);
+		$validator = $this->createStub(IFilenameValidator::class);
 		$validator->method('isFilenameValid')->willReturn(true);
-		$url = $this->createMock(IURLGenerator::class);
+		$url = $this->createStub(IURLGenerator::class);
 		$url->method('getBaseUrl')->willReturn('https://example.test');
 
 		$controller = new ExtractionController(
 			'extract',
-			$this->createMock(IRequest::class),
+			$this->createStub(IRequest::class),
 			new ExtractionService($l10n, $logger),
 			$root,
 			$l10n,
@@ -265,26 +265,26 @@ final class ExtractionDestinationTest extends TestCase {
 	}
 
 	private function controller(Folder $folder, ITempManager $temp, ?IFilenameValidator $validator = null): ExtractionController {
-		$root = $this->createMock(IRootFolder::class);
+		$root = $this->createStub(IRootFolder::class);
 		$root->method('getUserFolder')->willReturn($folder);
 
-		$l10n = $this->createMock(IL10N::class);
+		$l10n = $this->createStub(IL10N::class);
 		$l10n->method('t')->willReturnCallback(static fn (string $text, $parameters = []): string => $text);
-		$logger = $this->createMock(LoggerInterface::class);
+		$logger = $this->createStub(LoggerInterface::class);
 		if ($validator === null) {
-			$validator = $this->createMock(IFilenameValidator::class);
+			$validator = $this->createStub(IFilenameValidator::class);
 			$validator->method('isFilenameValid')->willReturn(true);
 		}
 
 		return new ExtractionController(
 			'extract',
-			$this->createMock(IRequest::class),
+			$this->createStub(IRequest::class),
 			new ExtractionService($l10n, $logger),
 			$root,
 			$l10n,
 			$logger,
 			'user',
-			$this->createMock(IURLGenerator::class),
+			$this->createStub(IURLGenerator::class),
 			$validator,
 			$temp,
 		);
