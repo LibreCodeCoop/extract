@@ -152,9 +152,9 @@ test('OCS preserves a 16 MiB file extracted from a ZIP', async ({ request }) => 
 		expect(extracted.status()).toBe(200)
 		const actual = await extracted.body()
 		expect(actual.length).toBe(expected.length)
-		expect(createHash('sha256').update(actual).digest('hex')).toBe(
-			createHash('sha256').update(expected).digest('hex'),
-		)
+		const actualHash = createHash('sha256').update(actual).digest('hex')
+		const expectedHash = createHash('sha256').update(expected).digest('hex')
+		expect(actualHash).toBe(expectedHash)
 	} finally {
 		await deleteFile(request, name)
 		await deleteFile(request, destination)
@@ -254,7 +254,6 @@ test('Files action validates, cancels and confirms extraction destinations', asy
 		await deleteFile(request, dir)
 	}
 })
-
 
 /**
  * Integration coverage for the 7za path, which the default Nextcloud image
