@@ -179,8 +179,8 @@ final class ExtractionDestinationTest extends TestCase {
 		);
 
 		$year = $this->createMock(Folder::class);
-		$year->method('nodeExists')->with('2026')->willReturn(false);
-		$year->method('newFolder')->with('2026')->willReturn($destination);
+		$year->method('nodeExists')->with('Q4 #2026')->willReturn(false);
+		$year->method('newFolder')->with('Q4 #2026')->willReturn($destination);
 		$folder = $this->createMock(Folder::class);
 		$folder->method('isCreatable')->willReturn(true);
 		$folder->method('nodeExists')->willReturn(false);
@@ -190,7 +190,7 @@ final class ExtractionDestinationTest extends TestCase {
 				return match ($path) {
 					'/' => $folder,
 					'//backup.zip' => $archiveNode,
-					'/reports/2026' => $destination,
+					'/reports/Q4 #2026' => $destination,
 					default => throw new \RuntimeException('Unexpected file lookup: ' . $path),
 				};
 			},
@@ -227,10 +227,14 @@ final class ExtractionDestinationTest extends TestCase {
 			$temp,
 		);
 		try {
-			$result = $controller->execute('backup.zip', '/', false, 'application/zip', 'reports/2026')->getData();
+			$result = $controller->execute('backup.zip', '/', false, 'application/zip', 'reports/Q4 #2026')->getData();
 			self::assertSame(1, $result['code']);
 			self::assertSame('from s3', $written);
 			self::assertSame(42, $result['extracted']['fileId']);
+			self::assertSame(
+				'https://example.test/remote.php/dav/files/user/reports/Q4%20%232026',
+				$result['extracted']['source'],
+			);
 			self::assertDirectoryDoesNotExist($scratch);
 		} finally {
 			if (is_file($archive)) {
@@ -241,6 +245,23 @@ final class ExtractionDestinationTest extends TestCase {
 			}
 			rmdir($rootDir);
 		}
+	}
+
+	/**
+	 * A folder cannot be passed off as an archive by supplying a ZIP MIME type.
+	 */
+	public function testRejectsFolderNodeAsArchiveWithoutReadingStorage(): void {
+		$folder = $this->createMock(Folder::class);
+		$folder->method('isCreatable')->willReturn(true);
+		$folder->method('get')->willReturn($folder);
+		$folder->method('nodeExists')->willReturn(false);
+		$folder->expects(self::never())->method('getStorage');
+		$temp = $this->createMock(ITempManager::class);
+		$temp->expects(self::never())->method('getTemporaryFolder');
+
+		$result = $this->controller($folder, $temp)->execute('folder.zip', '/', false, 'application/zip', 'output')->getData();
+		self::assertSame(0, $result['code']);
+		self::assertSame('File not found', $result['desc']);
 	}
 
 	private function controller(Folder $folder, ITempManager $temp, ?IFilenameValidator $validator = null): ExtractionController {

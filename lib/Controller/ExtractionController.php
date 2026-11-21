@@ -14,6 +14,7 @@ use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\ApiRoute;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\DataResponse;
+use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IFilenameValidator;
 
@@ -82,11 +83,6 @@ final class ExtractionController extends AEnvironmentAwareController {
 	) {
 		parent::__construct($AppName, $request);
 		$this->userFolder = $this->rootFolder->getUserFolder($this->userId);
-	}
-
-	private function getFile(string $directory, string $fileName): string|false {
-		$fileNode = $this->userFolder->get($directory . '/' . $fileName);
-		return $fileNode->getStorage()->getLocalFile($fileNode->getInternalPath());
 	}
 
 	/**
@@ -311,9 +307,9 @@ final class ExtractionController extends AEnvironmentAwareController {
 	/**
 	 * Resolve the folder the extracted tree is imported into, creating it if needed.
 	 *
-	 * The local path lets the extraction merge into an existing folder, so the
-	 * import must do the same instead of failing when a folder of that name is
-	 * already present.
+	 * Clients using the implicit legacy destination may merge into an existing
+	 * folder. An explicitly chosen destination must be new, and its final
+	 * component is checked again before any import begins.
 	 *
 	 * @param string $directory The Nextcloud directory holding the archive.
 	 * @param string $fileName The result-folder name.
@@ -490,7 +486,16 @@ final class ExtractionController extends AEnvironmentAwareController {
 		// Never write extracted files directly into a mounted storage path.
 		// Untrusted archives are unpacked into an isolated temporary directory
 		// and imported through Nextcloud so file permissions and hooks apply.
-		$file = $this->getFile($directory, $nameOfFile);
+		// The archive was already resolved above. Never attempt to extract a
+		// folder masquerading as an archive or resolve the node twice.
+		if ($archiveNode instanceof File === false) {
+			return new DataResponse(['code' => 0, 'desc' => $this->l->t('File not found')]);
+		}
+		try {
+			$file = $archiveNode->getStorage()->getLocalFile($archiveNode->getInternalPath());
+		} catch (NotFoundException|NotPermittedException $e) {
+			return new DataResponse(['code' => 0, 'desc' => $this->l->t('File not found')]);
+		}
 		if ($file === false) {
 			return new DataResponse(['code' => 0, 'desc' => $this->l->t('File not found')]);
 		}
@@ -548,7 +553,10 @@ final class ExtractionController extends AEnvironmentAwareController {
 			$owner = $node->getOwner()?->getUID();
 			$permissions = $node->getPermissions();
 			$mTime = $node->getMTime();
-			$source = $this->urlGenerator->getBaseUrl() . '/remote.php/dav/files/' . $this->userId . "$extractDir";
+			// Files app nodes require an encoded DAV URL. A user-selected target
+			// can contain spaces, #, ? or Unicode characters in any component.
+			$encodedDir = implode('/', array_map('rawurlencode', explode('/', $extractDir)));
+			$source = $this->urlGenerator->getBaseUrl() . '/remote.php/dav/files/' . rawurlencode($this->userId) . $encodedDir;
 			$root = '/files/' . $this->userId;
 			$mountType = $node->getMountPoint()->getMountType();
 			$ownerDisplayName = $node->getOwner()?->getDisplayName();
