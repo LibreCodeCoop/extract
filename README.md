@@ -56,9 +56,12 @@ occ config:app:set extract max_extracted_bytes --value=4294967296
 occ config:app:set extract max_archive_entries --value=20000
 ```
 
-These limits currently cover ZIP archives; other extractors have separate
-runtime dependencies and must be assessed independently before exposing them
-to untrusted uploads.
+The same configured limits and destination-space estimates are now checked
+against the *declared* contents of archives handled by `7za` (7z, tar,
+Gzip, Bzip2 and Deb) **before** launching their extraction. Unlike the ZIP
+streaming path, an external decoder may expand beyond dishonest archive
+metadata before the app can stop it; this is a preflight safeguard and not
+a process-level disk quota. RAR decoding still needs separate resource bounds.
 
 The `zip` PHP extension is required for Zip files. Rar needs either the PHP
 `rar` extension or the `unrar` binary; every other format is handled by the

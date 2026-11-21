@@ -176,12 +176,12 @@ final class ExtractionController extends AEnvironmentAwareController {
 	 * @param string $extractTo The local file-system path of the destination.
 	 * @return array{code: 0|1, desc?: string}
 	 */
-	private function extractWrappedTarball(string $file, string $extractTo): array {
+	private function extractWrappedTarball(string $file, string $extractTo, ?int $availableBytes = null): array {
 		// A unique scratch directory: a predictable sibling name could collide
 		// with, and then delete, an unrelated folder in the same directory.
 		$scratch = $extractTo . '.unwrapped.' . bin2hex(random_bytes(8));
 
-		$response = $this->extractionService->extractOther($file, $scratch);
+		$response = $this->extractionService->extractOther($file, $scratch, $availableBytes);
 		if (($response['code'] ?? 0) === 0) {
 			$this->removeDirectory($scratch);
 			return $response;
@@ -194,7 +194,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 			return ['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')];
 		}
 
-		$response = $this->extractionService->extractOther($innerTar, $extractTo);
+		$response = $this->extractionService->extractOther($innerTar, $extractTo, $availableBytes);
 		$this->removeDirectory($scratch);
 
 		return $response;
@@ -538,10 +538,10 @@ final class ExtractionController extends AEnvironmentAwareController {
 				break;
 			default:
 				if (self::isWrappedTarball($nameOfFile) === true) {
-					$response = $this->extractWrappedTarball($file, $extractTo);
+					$response = $this->extractWrappedTarball($file, $extractTo, $destinationParent->getFreeSpace());
 				} else {
 					// A plain .tar and every non-tar format is a single 7za pass.
-					$response = $this->extractionService->extractOther($file, $extractTo);
+					$response = $this->extractionService->extractOther($file, $extractTo, $destinationParent->getFreeSpace());
 				}
 				break;
 		}

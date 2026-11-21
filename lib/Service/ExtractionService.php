@@ -79,8 +79,15 @@ final class ExtractionService {
 		return null;
 	}
 
-	/** @return null|array{code: 0, desc: string} */
-	private function assertSafe7z(string $file): ?array {
+	/**
+	 * Validate 7za archive paths and reject metadata announcing extraction
+	 * beyond the available quota, staging space, or configured resource caps.
+	 * The external decoder may still misreport sizes; this is a preflight,
+	 * not a substitute for process-level disk isolation.
+	 *
+	 * @return null|array{code: 0, desc: string}
+	 */
+	private function assertSafe7z(string $file, ?int $availableBytes, ?int $temporarySpace): ?array {
 		$output = [];
 		$return = 0;
 		exec('7za l -ba -slt ' . escapeshellarg($file) . ' 2>&1', $output, $return);
@@ -88,11 +95,34 @@ final class ExtractionService {
 			$this->logger->error('7za list failed (rc=' . $return . '): ' . implode("\n", $output));
 			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect archive contents')];
 		}
+		$budget = $this->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
+		if ($availableBytes !== null && $availableBytes >= 0) {
+			$budget = min($budget, $availableBytes);
+		}
+		if ($temporarySpace !== null && $temporarySpace >= 0) {
+			$budget = min($budget, $temporarySpace);
+		}
+		$entryLimit = $this->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES);
+		$entries = 0;
+		$size = 0;
 		foreach ($output as $line) {
 			if (str_starts_with($line, 'Path = ')) {
 				if ($error = $this->rejectUnsafe(substr($line, 7))) {
 					return $error;
 				}
+				$entries++;
+				if ($entries > $entryLimit) {
+					return ['code' => 0, 'desc' => $this->l->t('Archive contains too many files')];
+				}
+			} elseif (str_starts_with($line, 'Size = ')) {
+				$declaredSize = filter_var(trim(substr($line, 7)), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+				if ($declaredSize === false) {
+					return ['code' => 0, 'desc' => $this->l->t('Failed to inspect archive contents')];
+				}
+				if ($declaredSize > $budget - $size) {
+					return ['code' => 0, 'desc' => $this->l->t('Archive exceeds the allowed extraction size')];
+				}
+				$size += $declaredSize;
 			}
 		}
 		return null;
@@ -288,10 +318,15 @@ final class ExtractionService {
 	 *
 	 * @psalm-return array{code: 0|1, desc?: string}
 	 */
-	public function extractOther(string $file, string $extractTo): array {
+	public function extractOther(string $file, string $extractTo, ?int $availableBytes = null): array {
 		$response = [];
 
-		if ($error = $this->assertSafe7z($file)) {
+		$temporarySpace = disk_free_space(dirname($extractTo));
+		if ($error = $this->assertSafe7z(
+			$file,
+			$availableBytes,
+			$temporarySpace === false ? null : (int)$temporarySpace,
+		)) {
 			return $error;
 		}
 		$output = [];
