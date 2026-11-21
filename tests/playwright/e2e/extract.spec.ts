@@ -7,7 +7,7 @@ import type { APIRequestContext } from '@playwright/test'
 
 import { expect, test } from '@playwright/test'
 import { Buffer } from 'node:buffer'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 
 const user = process.env.NC_ADMIN_USER ?? 'e2e'
@@ -17,6 +17,49 @@ if (!password) {
 }
 const authorization = 'Basic ' + Buffer.from(user + ':' + password).toString('base64')
 const fixture = Buffer.from('UEsDBBQAAAAIAK1mdV2a8R5qHQAAABsAAAAJAAAAaGVsbG8udHh0c60oKUpMLlFIKsovL04tUnA1clUoSCwuTk3hAgBQSwECFAMUAAAACACtZnVdmvEeah0AAAAbAAAACQAAAAAAAAAAAAAAgAEAAAAAaGVsbG8udHh0UEsFBgAAAAABAAEANwAAAEQAAAAAAA==', 'base64')
+/**
+ * Construct a valid single-file, STORE-method ZIP using only Node built-ins.
+ * This provides a deterministic, moderately large integration fixture without
+ * adding a dependency, an external archive builder or a committed large file.
+ */
+function storedZip(name: string, contents: Buffer): Buffer {
+	const bytes = Buffer.from(name, 'utf8')
+	let crc = 0xFFFFFFFF
+	for (const byte of contents) {
+		crc ^= byte
+		for (let bit = 0; bit < 8; bit++) {
+			crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0)
+		}
+	}
+	crc = (crc ^ 0xFFFFFFFF) >>> 0
+
+	const local = Buffer.alloc(30)
+	local.writeUInt32LE(0x04034B50, 0)
+	local.writeUInt16LE(20, 4)
+	local.writeUInt32LE(crc, 14)
+	local.writeUInt32LE(contents.length, 18)
+	local.writeUInt32LE(contents.length, 22)
+	local.writeUInt16LE(bytes.length, 26)
+
+	const central = Buffer.alloc(46)
+	central.writeUInt32LE(0x02014B50, 0)
+	central.writeUInt16LE(20, 4)
+	central.writeUInt16LE(20, 6)
+	central.writeUInt32LE(crc, 16)
+	central.writeUInt32LE(contents.length, 20)
+	central.writeUInt32LE(contents.length, 24)
+	central.writeUInt16LE(bytes.length, 28)
+
+	const end = Buffer.alloc(22)
+	end.writeUInt32LE(0x06054B50, 0)
+	end.writeUInt16LE(1, 8)
+	end.writeUInt16LE(1, 10)
+	end.writeUInt32LE(central.length + bytes.length, 12)
+	end.writeUInt32LE(local.length + bytes.length + contents.length, 16)
+
+	return Buffer.concat([local, bytes, contents, central, bytes, end])
+}
+
 const apiHeaders = {
 	Authorization: authorization,
 	'OCS-APIRequest': 'true',
@@ -72,6 +115,48 @@ test('OCS extracts a ZIP to the chosen destination on Nextcloud Files', async ({
 		expect(await created.text()).toBe('Extract browser E2E passed\n')
 	} finally {
 		await deleteFile(request, file)
+		await deleteFile(request, destination)
+	}
+})
+
+/**
+ * Regression coverage for large-file extraction, avoiding a tiny fixture as
+ * the sole evidence that streamed Nextcloud imports preserve full contents.
+ */
+test('OCS preserves a 16 MiB file extracted from a ZIP', async ({ request }) => {
+	const name = 'extract-sized-' + randomUUID().slice(0, 8) + '.zip'
+	const destination = 'extract-sized-' + randomUUID().slice(0, 8)
+	const expected = Buffer.alloc(16 * 1024 * 1024, 0x42)
+	try {
+		const uploaded = await request.put(dav(name), {
+			headers: { Authorization: authorization, 'Content-Type': 'application/zip' },
+			data: storedZip('medium.bin', expected),
+		})
+		expect(uploaded.status()).toBe(201)
+		const response = await request.post(extractEndpoint, {
+			headers: apiHeaders,
+			data: {
+				nameOfFile: name,
+				directory: '/',
+				external: false,
+				mime: 'application/zip',
+				targetDirName: destination,
+			},
+		})
+		expect(response.ok()).toBeTruthy()
+		const result = await response.json()
+		expect(result.ocs.data.code).toBe(1)
+		const extracted = await request.get(dav(destination + '/medium.bin'), {
+			headers: { Authorization: authorization },
+		})
+		expect(extracted.status()).toBe(200)
+		const actual = await extracted.body()
+		expect(actual.length).toBe(expected.length)
+		expect(createHash('sha256').update(actual).digest('hex')).toBe(
+			createHash('sha256').update(expected).digest('hex'),
+		)
+	} finally {
+		await deleteFile(request, name)
 		await deleteFile(request, destination)
 	}
 })
