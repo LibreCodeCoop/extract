@@ -42,7 +42,7 @@ final class WrappedTarballExtractionTest extends TestCase {
 			self::markTestSkipped('7za is not installed');
 		}
 
-		$l10n = $this->createMock(IL10N::class);
+		$l10n = $this->createStub(IL10N::class);
 		$l10n->method('t')->willReturnCallback(
 			static fn (string $text, $parameters = []): string => $text,
 		);
@@ -54,8 +54,8 @@ final class WrappedTarballExtractionTest extends TestCase {
 		$reflection = new \ReflectionClass(ExtractionController::class);
 		$this->controller = $reflection->newInstanceWithoutConstructor();
 
-		$this->setProperty('extractionService', new ExtractionService($l10n, $this->createMock(LoggerInterface::class)));
-		$this->setProperty('logger', $this->createMock(LoggerInterface::class));
+		$this->setProperty('extractionService', new ExtractionService($l10n, $this->createStub(LoggerInterface::class)));
+		$this->setProperty('logger', $this->createStub(LoggerInterface::class));
 		$this->setProperty('l', $l10n);
 	}
 

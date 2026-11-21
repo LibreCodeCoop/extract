@@ -24,9 +24,9 @@ use ZipArchive;
  */
 final class ExtractionServiceTest extends TestCase {
 	private ?ExtractionService $service = null;
-	/** @var IL10N&MockObject */
+	/** @var IL10N */
 	private ?IL10N $l10n = null;
-	/** @var LoggerInterface&MockObject */
+	/** @var LoggerInterface */
 	private ?LoggerInterface $logger = null;
 	private string $tmpDir = '';
 
@@ -36,11 +36,11 @@ final class ExtractionServiceTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
-		$this->l10n = $this->createMock(IL10N::class);
+		$this->l10n = $this->createStub(IL10N::class);
 		$this->l10n->method('t')->willReturnCallback(
 			static fn (string $text, $parameters = []): string => $text,
 		);
-		$this->logger = $this->createMock(LoggerInterface::class);
+		$this->logger = $this->createStub(LoggerInterface::class);
 
 		$this->service = new ExtractionService($this->l10n, $this->logger);
 

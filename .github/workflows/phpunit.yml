@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php-versions: ['8.1', '8.2', '8.3', '8.4']
+        php-versions: ['8.3', '8.4', '8.5']
 
     name: php${{ matrix.php-versions }}
 
@@ -47,8 +47,13 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress
 
+      - name: Install archive backends needed by tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq p7zip-full
+
       - name: Run unit tests
-        run: composer run test:unit
+        run: composer run test:unit -- --no-progress
 
   summary:
     permissions:
