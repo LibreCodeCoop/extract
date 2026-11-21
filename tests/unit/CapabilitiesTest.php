@@ -11,7 +11,6 @@ namespace OCA\Extract\Tests\unit;
 
 use OCA\Extract\Capabilities;
 use OCP\App\IAppManager;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**

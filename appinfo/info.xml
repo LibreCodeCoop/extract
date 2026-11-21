@@ -41,7 +41,7 @@
     <bugs>https://github.com/LibreCodeCoop/extract/issues</bugs>
     <screenshot>https://raw.githubusercontent.com/LibreCodeCoop/extract/main/img/extract.png</screenshot>
     <dependencies>
-        <nextcloud min-version="33" max-version="35"/>
         <php min-version="8.3" max-version="8.5"/>
+        <nextcloud min-version="33" max-version="35"/>
     </dependencies>
 </info>

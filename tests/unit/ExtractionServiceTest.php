@@ -11,7 +11,6 @@ namespace OCA\Extract\Tests\unit;
 
 use OCA\Extract\Service\ExtractionService;
 use OCP\IL10N;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use ZipArchive;
