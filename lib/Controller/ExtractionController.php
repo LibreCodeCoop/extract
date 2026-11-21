@@ -153,6 +153,22 @@ final class ExtractionController extends AEnvironmentAwareController {
 	}
 
 	/**
+	 * Validate a destination relative to the archive's containing folder.
+	 *
+	 * Each component is validated individually; a name may contain subfolders,
+	 * but cannot address the parent folder, an absolute path, or a control byte.
+	 */
+	private static function isUsableRelativeDestinationPath(string $path): bool {
+		foreach (explode('/', $path) as $component) {
+			if (self::isUsableFolderName($component) === false
+				|| preg_match('/[\x00-\x1f\x7f]/', $component) === 1) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
 	 * Extract a tar that is wrapped in a compression layer.
 	 *
 	 * The wrapper is unwrapped into a request-owned scratch directory first,
@@ -246,10 +262,10 @@ final class ExtractionController extends AEnvironmentAwareController {
 	/**
 	 * Validate and publish extracted files through the Nextcloud files API.
 	 */
-	private function postExtract(string $fileName, string $directory, string $extractTo): void {
+	private function postExtract(string $fileName, string $directory, string $extractTo, bool $rejectExisting = false): void {
 		$this->assertNoSymbolicLinks($extractTo);
 		$this->removeForbiddenFiles($extractTo);
-		$this->importDirectory($extractTo, $this->destinationFolder($directory, $fileName));
+		$this->importDirectory($extractTo, $this->destinationFolder($directory, $fileName, $rejectExisting));
 	}
 
 	/**
@@ -302,20 +318,30 @@ final class ExtractionController extends AEnvironmentAwareController {
 	 * @param string $directory The Nextcloud directory holding the archive.
 	 * @param string $fileName The result-folder name.
 	 */
-	private function destinationFolder(string $directory, string $fileName): Folder {
+	private function destinationFolder(string $directory, string $fileName, bool $rejectExisting = false): Folder {
 		$parent = $this->userFolder->get($directory);
 		if ($parent instanceof Folder === false || $parent->isCreatable() === false) {
 			throw new NotPermittedException('No permission to create files in the destination folder');
 		}
-		if ($parent->nodeExists($fileName) === true) {
-			$existing = $parent->get($fileName);
-			if ($existing instanceof Folder === false || $existing->isCreatable() === false) {
-				throw new NotPermittedException($fileName . ' is not a writable folder');
+
+		$components = explode('/', $fileName);
+		$last = count($components) - 1;
+		foreach ($components as $index => $component) {
+			if ($parent->nodeExists($component) === true) {
+				if ($rejectExisting === true && $index === $last) {
+					throw new NotPermittedException('Destination folder already exists');
+				}
+				$existing = $parent->get($component);
+				if ($existing instanceof Folder === false || $existing->isCreatable() === false) {
+					throw new NotPermittedException($component . ' is not a writable folder');
+				}
+				$parent = $existing;
+			} else {
+				$parent = $parent->newFolder($component);
 			}
-			return $existing;
 		}
 
-		return $parent->newFolder($fileName);
+		return $parent;
 	}
 
 	/**
@@ -404,6 +430,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 	 * @param string $directory Directory where the file is located
 	 * @param bool $external Retained for backward compatibility; storage is resolved server-side.
 	 * @param string $mime MIME type of the file
+	 * @param ?string $targetDirName Optional relative folder path under the archive directory
 	 * @return DataResponse<Http::STATUS_OK, array{code?: 0|1, desc?: string, extracted?: ExtractFolder}, array{}>|DataResponse<Http::STATUS_NOT_FOUND, array<empty>, array{}>
 	 *
 	 * 200: OK
@@ -416,6 +443,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 		string $directory,
 		bool $external,
 		string $mime,
+		?string $targetDirName = null,
 	): DataResponse {
 		if (isset(self::SUPPORTED_MIME_TYPES[$mime]) === false) {
 			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Unsupported archive type')]);
@@ -430,6 +458,20 @@ final class ExtractionController extends AEnvironmentAwareController {
 			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Unsupported archive type')]);
 		}
 
+		// Explicit destinations may include subfolders, but never escape the
+		// archive's directory. The server validates again after frontend checks.
+		$fileName = $targetDirName === null ? $resultFolder : trim($targetDirName);
+		if (self::isUsableRelativeDestinationPath($fileName) === false) {
+			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Invalid extraction folder name')]);
+		}
+		if ($targetDirName !== null) {
+			foreach (explode('/', $fileName) as $component) {
+				if ($this->filenameValidator->isFilenameValid($component) === false) {
+					return new DataResponse(['code' => 0, 'desc' => $this->l->t('Invalid extraction folder name')]);
+				}
+			}
+		}
+
 		try {
 			$archiveNode = $this->userFolder->get($directory . '/' . $nameOfFile);
 			$destinationParent = $this->userFolder->get($directory);
@@ -439,11 +481,15 @@ final class ExtractionController extends AEnvironmentAwareController {
 		if ($destinationParent instanceof Folder === false || $destinationParent->isCreatable() === false) {
 			return new DataResponse(['code' => 0, 'desc' => $this->l->t('You do not have permission to extract here')]);
 		}
+		// An explicit destination must not overwrite an existing folder.
+		// Keep legacy clients (which omit targetDirName) compatible.
+		if ($targetDirName !== null && $destinationParent->nodeExists($fileName) === true) {
+			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Destination folder already exists')]);
+		}
 
 		// Never write extracted files directly into a mounted storage path.
 		// Untrusted archives are unpacked into an isolated temporary directory
 		// and imported through Nextcloud so file permissions and hooks apply.
-		$fileName = $resultFolder;
 		$file = $this->getFile($directory, $nameOfFile);
 		if ($file === false) {
 			return new DataResponse(['code' => 0, 'desc' => $this->l->t('File not found')]);
@@ -454,7 +500,8 @@ final class ExtractionController extends AEnvironmentAwareController {
 			$this->logger->error(__METHOD__ . ': could not create a temporary extraction directory');
 			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);
 		}
-		$extractTo = rtrim($scratch, '/') . '/' . $fileName;
+		// Do not interpolate user-controlled names into operating-system paths.
+		$extractTo = rtrim($scratch, '/') . '/payload';
 
 		switch ($type) {
 			case 'zip':
@@ -483,7 +530,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 		}
 
 		try {
-			$this->postExtract($fileName, $directory, $extractTo);
+			$this->postExtract($fileName, $directory, $extractTo, $targetDirName !== null);
 		} catch (NotFoundException|NotPermittedException|InvalidPathException $e) {
 			$this->logger->error(__METHOD__ . ': could not publish the extracted folder: ' . $e->getMessage());
 			return new DataResponse(['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);

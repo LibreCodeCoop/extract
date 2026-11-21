@@ -85,6 +85,8 @@ export interface operations {
                     external: boolean;
                     /** @description MIME type of the file */
                     mime: string;
+                    /** @description Optional relative folder path under the archive directory */
+                    targetDirName?: string | null;
                 };
             };
         };

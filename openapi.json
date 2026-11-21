@@ -164,6 +164,11 @@
                                     "mime": {
                                         "type": "string",
                                         "description": "MIME type of the file"
+                                    },
+                                    "targetDirName": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Optional relative folder path under the archive directory"
                                     }
                                 }
                             }
