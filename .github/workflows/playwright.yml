@@ -96,6 +96,9 @@ jobs:
             maintenance:install --database sqlite --database-name nextcloud \
             --admin-user e2e --admin-pass "$NEXTCLOUD_ADMIN_PASSWORD"
           docker exec -u www-data extract-playwright-nextcloud php /var/www/html/occ app:enable extract
+          # The first-run wizard overlays the Files action menu on fresh NC
+          # installations; disable it only within this disposable test instance.
+          docker exec -u www-data extract-playwright-nextcloud php /var/www/html/occ app:disable firstrunwizard
           actual="$(docker exec -u www-data extract-playwright-nextcloud php /var/www/html/occ \
             status --output=json | jq -r '.versionstring' | cut -d. -f1)"
           test "$actual" = "$NC_MAJOR" || {

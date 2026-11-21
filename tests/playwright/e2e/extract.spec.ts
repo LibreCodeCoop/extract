@@ -93,7 +93,7 @@ test('OCS rejects destination traversal before writing any files', async ({ requ
 	}
 })
 
-test('Files UI displays the uploaded archive without extracting it', async ({ request, page }) => {
+test('Files action validates, cancels and confirms extraction destinations', async ({ request, page }) => {
 	const dir = 'extract-e2e-folder-' + randomUUID().slice(0, 8)
 	const created = await request.fetch(dav(dir), {
 		method: 'MKCOL',
@@ -114,10 +114,52 @@ test('Files UI displays the uploaded archive without extracting it', async ({ re
 		await page.goto('/apps/files/files?dir=' + encodeURIComponent('/' + dir))
 		const archive = page.getByRole('row', { name: file.slice(0, -4) })
 		await expect(archive).toBeVisible({ timeout: 30_000 })
-		// The row is rendered on NC33–35, while the download control's
-		// accessible name is not consistent across the three Files UIs.
-		const response = await request.get(dav(dir + '/' + file.slice(0, -4)), { headers: { Authorization: authorization } })
-		expect(response.status()).toBe(404)
+		// Nextcloud's first-login "What's new" modal can cover the actions menu.
+		// Dismiss only that onboarding dialog, not dialogs from the app under test.
+		const onboarding = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: "What's new?" }) })
+		if (await onboarding.isVisible()) {
+			await onboarding.getByRole('button', { name: 'Close' }).click()
+		}
+		// Open the Nextcloud Files action for this archive. A cancelled
+		// dialog must not call the extraction endpoint or create a folder.
+		await archive.getByRole('button', { name: 'Actions' }).click()
+		const action = page.getByRole('menuitem', { name: /Extract/i })
+		await expect(action).toBeVisible()
+		await action.click()
+		const extractionRequests: string[] = []
+		page.on('request', (event) => {
+			if (event.method() === 'POST' && event.url().includes('/apps/extract/api/v1/extraction/execute')) {
+				extractionRequests.push(event.url())
+			}
+		})
+		const dialog = page.getByRole('dialog', { name: 'Extract archive' })
+		await expect(dialog).toBeVisible()
+		const destinationInput = dialog.getByRole('textbox', { name: 'Destination folder' })
+		const extractButton = dialog.getByRole('button', { name: 'Extract', exact: true })
+		await expect(destinationInput).toHaveValue(file.slice(0, -4))
+		await destinationInput.fill('../escape')
+		await expect(extractButton).toBeDisabled()
+		await destinationInput.fill(file.slice(0, -4))
+		await expect(extractButton).toBeEnabled()
+		await dialog.getByRole('button', { name: 'Cancel' }).click()
+		await expect(dialog).toBeHidden()
+		expect(extractionRequests).toHaveLength(0)
+		const absent = await request.get(dav(dir + '/' + file.slice(0, -4)), { headers: { Authorization: authorization } })
+		expect(absent.status()).toBe(404)
+
+		// Confirming a different destination must use the Files action's
+		// browser-to-OCS contract and write through Nextcloud's DAV API.
+		await archive.getByRole('button', { name: 'Actions' }).click()
+		await page.getByRole('menuitem', { name: /Extract/i }).click()
+		const confirmed = page.getByRole('dialog', { name: 'Extract archive' })
+		await expect(confirmed).toBeVisible()
+		await confirmed.getByRole('textbox', { name: 'Destination folder' }).fill('browser-verified')
+		await confirmed.getByRole('button', { name: 'Extract', exact: true }).click()
+		await expect.poll(async () => {
+			const response = await request.get(dav(dir + '/browser-verified/hello.txt'), { headers: { Authorization: authorization } })
+			return response.status()
+		}, { timeout: 20_000 }).toBe(200)
+		expect(extractionRequests).toHaveLength(1)
 	} finally {
 		await deleteFile(request, dir)
 	}
