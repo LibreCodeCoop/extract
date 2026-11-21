@@ -45,6 +45,21 @@ the archive directory.
 Extraction needs enough free space in the server's temporary directory for the
 uncompressed archive. Symbolic links in archives are not supported.
 
+ZIP extraction enforces the destination's available Nextcloud quota, staging
+disk free space, and two configurable safety limits (defaults: **2 GiB** total
+uncompressed bytes and **10,000** entries). The limits apply before extraction
+using ZIP metadata and during streaming using the actual bytes written.
+Administrators may adjust them for trusted large archives, for example:
+
+```bash
+occ config:app:set extract max_extracted_bytes --value=4294967296
+occ config:app:set extract max_archive_entries --value=20000
+```
+
+These limits currently cover ZIP archives; other extractors have separate
+runtime dependencies and must be assessed independently before exposing them
+to untrusted uploads.
+
 The `zip` PHP extension is required for Zip files. Rar needs either the PHP
 `rar` extension or the `unrar` binary; every other format is handled by the
 `7za` binary shipped with p7zip.

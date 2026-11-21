@@ -205,7 +205,7 @@ final class ExtractionControllerTest extends TestCase {
 		// A real service instance. The archive path does not exist, so extractZip()
 		// reports "Cannot open Zip file" — reaching it proves the non-local storage
 		// no longer refuses the request.
-		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class));
+		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class), $this->createStub(\OCP\IConfig::class));
 
 		$controller = new ExtractionController(
 			'extract',
@@ -271,7 +271,7 @@ final class ExtractionControllerTest extends TestCase {
 		// A real service instance. The archive path does not exist, so
 		// extractZip() reports "Cannot open Zip file" — reaching it proves the
 		// local-storage path let the request through.
-		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class));
+		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class), $this->createStub(\OCP\IConfig::class));
 
 		$controller = new ExtractionController(
 			'extract',
@@ -317,7 +317,7 @@ final class ExtractionControllerTest extends TestCase {
 		$controller = new ExtractionController(
 			'extract',
 			$this->createStub(IRequest::class),
-			new ExtractionService($l10n, $this->createStub(LoggerInterface::class)),
+			new ExtractionService($l10n, $this->createStub(LoggerInterface::class), $this->createStub(\OCP\IConfig::class)),
 			$rootFolder,
 			$l10n,
 			$this->createStub(LoggerInterface::class),
