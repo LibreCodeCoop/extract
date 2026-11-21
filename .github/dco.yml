@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 LibreCode coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Accept explicit, auditable remediation statements for earlier commits.
+# Signers must have the right to certify the relevant contribution.
+# This does not exempt commits from DCO.
+allowRemediationCommits:
+  individual: true
+  thirdParty: true
