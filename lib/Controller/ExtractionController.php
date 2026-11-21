@@ -205,6 +205,10 @@ final class ExtractionController extends AEnvironmentAwareController {
 		);
 		foreach ($iterator as $entry) {
 			/** @var \SplFileInfo $entry */
+			// Never follow a link to an archive outside our staging directory.
+			if ($entry->isLink()) {
+				return null;
+			}
 			if ($entry->isFile() === true) {
 				$files[] = $entry->getPathname();
 			}
@@ -229,7 +233,8 @@ final class ExtractionController extends AEnvironmentAwareController {
 		);
 		foreach ($iterator as $entry) {
 			/** @var \SplFileInfo $entry */
-			if ($entry->isDir() === true) {
+			// A symlink to a directory must be unlinked, not rmdir()'d.
+			if ($entry->isDir() === true && $entry->isLink() === false) {
 				rmdir($entry->getPathname());
 			} else {
 				unlink($entry->getPathname());

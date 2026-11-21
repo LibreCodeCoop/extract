@@ -359,6 +359,62 @@ final class ExtractionControllerTest extends TestCase {
 	}
 
 	/**
+	 * An inner tar may not be a link to a file outside the staging directory.
+	 */
+	public function testDoesNotFollowLinkedInnerArchives(): void {
+		$source = sys_get_temp_dir() . '/extract-inner-link-' . bin2hex(random_bytes(6));
+		$outside = sys_get_temp_dir() . '/extract-external-archive-' . bin2hex(random_bytes(6));
+		mkdir($source, 0700, true);
+		file_put_contents($outside, 'not in the staging directory');
+
+		$reflection = new \ReflectionClass(ExtractionController::class);
+		$controller = $reflection->newInstanceWithoutConstructor();
+		$method = new \ReflectionMethod(ExtractionController::class, 'findSingleFile');
+
+		try {
+			self::assertNull($method->invoke($controller, $source));
+			if (symlink($outside, $source . '/archive.tar') === false) {
+				self::markTestSkipped('The platform cannot create symbolic links');
+			}
+			self::assertNull($method->invoke($controller, $source));
+		} finally {
+			$this->removeDirectory($source);
+			unlink($outside);
+		}
+	}
+
+	/**
+	 * Cleaning up a symlink to a directory must not delete the linked directory.
+	 */
+	public function testScratchCleanupUnlinksDirectorySymlinks(): void {
+		$source = sys_get_temp_dir() . '/extract-scratch-link-' . bin2hex(random_bytes(6));
+		$outside = sys_get_temp_dir() . '/extract-external-dir-' . bin2hex(random_bytes(6));
+		mkdir($source, 0700, true);
+		mkdir($outside, 0700, true);
+		file_put_contents($outside . '/keep.txt', 'do not delete');
+
+		$reflection = new \ReflectionClass(ExtractionController::class);
+		$controller = $reflection->newInstanceWithoutConstructor();
+		$method = new \ReflectionMethod(ExtractionController::class, 'removeDirectory');
+
+		try {
+			if (symlink($outside, $source . '/linked-dir') === false) {
+				self::markTestSkipped('The platform cannot create symbolic links');
+			}
+			$method->invoke($controller, $source);
+			self::assertDirectoryDoesNotExist($source);
+			self::assertSame('do not delete', file_get_contents($outside . '/keep.txt'));
+		} finally {
+			if (is_link($source . '/linked-dir')) {
+				unlink($source . '/linked-dir');
+			}
+			$this->removeDirectory($source);
+			unlink($outside . '/keep.txt');
+			rmdir($outside);
+		}
+	}
+
+	/**
 	 * The import step recreates the extracted tree through the files API.
 	 *
 	 * Nested directories must be created before their contents, and every file must
