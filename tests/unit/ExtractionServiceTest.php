@@ -211,6 +211,31 @@ final class ExtractionServiceTest extends TestCase {
 	}
 
 	/**
+	 * TAR is handled by the external 7za decoder too: its declared size must
+	 * be checked before any output is staged. A permitted quota is the
+	 * positive control using the exact same synthetic archive.
+	 */
+	public function testTarArchiveRespectsDestinationQuota(): void {
+		if (trim((string)shell_exec('command -v 7za 2>/dev/null')) === '') {
+			self::markTestSkipped('7za is not installed');
+		}
+		$archive = $this->tmpDir . '/quota.tar';
+		$tar = new \PharData($archive);
+		$tar->addFromString('payload.txt', str_repeat('x', 256));
+		unset($tar);
+
+		$denied = $this->tmpDir . '/denied';
+		$failure = $this->service->extractOther($archive, $denied, 64);
+		self::assertSame(0, $failure['code']);
+		self::assertSame('Archive exceeds the allowed extraction size', $failure['desc']);
+		self::assertDirectoryDoesNotExist($denied);
+
+		$allowed = $this->tmpDir . '/allowed';
+		self::assertSame(['code' => 1], $this->service->extractOther($archive, $allowed, 512));
+		self::assertSame(str_repeat('x', 256), file_get_contents($allowed . '/payload.txt'));
+	}
+
+	/**
 	 * A decompression bomb must be refused before staging any files when the
 	 * total uncompressed content cannot fit the user's Nextcloud quota.
 	 */
