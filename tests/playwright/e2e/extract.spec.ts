@@ -5,7 +5,7 @@
 
 import type { APIRequestContext } from '@playwright/test'
 
-import { expect, request as apiRequest, test } from '@playwright/test'
+import { request as apiRequest, expect, test } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
