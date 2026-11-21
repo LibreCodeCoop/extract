@@ -45,10 +45,9 @@ the archive directory.
 Extraction needs enough free space in the server's temporary directory for the
 uncompressed archive. Symbolic links in archives are not supported.
 
-The `zip` PHP extension is required for ZIP. RAR uses the PHP `rar` extension,
-`unrar`, or, when neither is available, the full `7z` binary. The smaller
-`7za` binary does not necessarily support RAR; installing `7zip` (Debian 13)
-provides the full decoder. Other formats use `7za` from p7zip.
+The `zip` PHP extension is required for Zip files. Rar needs either the PHP
+`rar` extension or the `unrar` binary; every other format is handled by the
+`7za` binary shipped with p7zip.
 
 #### Ubuntu / Debian
 
@@ -145,6 +144,11 @@ parent folder. Extraction never modifies the archive itself.
 | Gzip | `.gz` | `7za` |
 | 7z | `.7z` | `7za` |
 | Deb | `.deb` | `7za` |
+
+On systems without the PHP `rar` extension or `unrar`, the full `7z`
+executable can extract supported RAR archives as an additional fallback.
+The smaller `7za` executable does not necessarily support RAR; on Debian 13,
+install the `7zip` package to obtain the full decoder.
 
 > **Note:** Archives protected by a password are not supported. Extraction works
 > on a normal Nextcloud data directory, on object storage and with server-side
