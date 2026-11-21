@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import { registerFileAction } from '@nextcloud/files'
-import { extractAction } from './actions/extract-action.ts'
+import { registerExtractAction } from './actions/extract-action.ts'
 
-registerFileAction(extractAction)
+registerExtractAction()

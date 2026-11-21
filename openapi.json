@@ -159,7 +159,7 @@
                                     },
                                     "external": {
                                         "type": "boolean",
-                                        "description": "Is the file located on an external storage?"
+                                        "description": "Retained for backward compatibility; storage is resolved server-side."
                                     },
                                     "mime": {
                                         "type": "string",
