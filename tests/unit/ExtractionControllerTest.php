@@ -172,7 +172,7 @@ final class ExtractionControllerTest extends TestCase {
 	public function testExecuteImportsOnNonLocalStorage(): void {
 		$storage = $this->createMock(IStorage::class);
 		$storage->method('isLocal')->willReturn(false);
-		// getFile() calls this and requires a string path.
+		// The storage API supplies a local extraction source even for remote files.
 		$storage->method('getLocalFile')->willReturn('/tmp/extract-test-archive.zip');
 
 		$node = $this->createMock(File::class);
@@ -238,7 +238,7 @@ final class ExtractionControllerTest extends TestCase {
 		$storage = $this->createMock(IStorage::class);
 		$storage->method('isLocal')->willReturn(true);
 
-		// getFile() calls this and requires a string path.
+		// The storage API supplies a local extraction source even for remote files.
 		$storage->method('getLocalFile')->willReturn('/tmp/extract-test-archive.zip');
 
 		$node = $this->createMock(File::class);

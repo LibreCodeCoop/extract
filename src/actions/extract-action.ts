@@ -11,6 +11,9 @@ import { emit } from '@nextcloud/event-bus'
 import { Folder, Permission, registerFileAction } from '@nextcloud/files'
 import { translate as t } from '@nextcloud/l10n'
 import { generateOcsUrl } from '@nextcloud/router'
+import { createApp } from 'vue'
+import ExtractionDialog from '../components/ExtractionDialog.vue'
+import { destinationParentPath, suggestedDestinationName } from './extraction-utils.ts'
 
 /**
  * MIME types the backend can extract.
@@ -146,15 +149,42 @@ function readExtractedFolder(response: ExtractionResponse): ExtractedFolder | nu
  *
  * @param node The archive to extract
  * @param folder The folder the archive lives in
+ * @param targetDirName Selected relative destination
  */
 // skipcq: JS-0067
-function buildRequestBody(node: INode, folder: IFolder) {
+function buildRequestBody(node: INode, folder: IFolder, targetDirName: string) {
 	return {
 		nameOfFile: node.basename,
 		directory: folder.path,
 		external: isExternalStorage(node) ? 1 : 0,
 		mime: archiveMimeOf(node),
+		targetDirName,
 	}
+}
+
+/**
+ * Display a native Nextcloud dialog and return the confirmed relative path.
+ *
+ * A cancelled dialog must resolve to null, not trigger the Files error toast.
+ *
+ * @param fileName Name of the archive
+ */
+async function chooseDestinationName(fileName: string): Promise<string | null> {
+	return new Promise((resolve) => {
+		const mount = document.createElement('div')
+		document.body.append(mount)
+		const app = createApp(ExtractionDialog, {
+			initialName: suggestedDestinationName(fileName),
+			onFinish: (value: string | null) => {
+				resolve(value)
+				window.setTimeout(() => {
+					app.unmount()
+					mount.remove()
+				}, 350)
+			},
+		})
+		app.mount(mount)
+	})
 }
 
 /**
@@ -171,7 +201,8 @@ function isEnabled(context: ActionContext): boolean {
 	const [node] = context.nodes
 	return node !== undefined
 		&& isSupportedArchive(node)
-		&& (node.permissions & Permission.UPDATE) !== 0
+		&& (node.permissions & Permission.READ) !== 0
+		&& (context.folder.permissions & Permission.CREATE) !== 0
 }
 
 /**
@@ -186,10 +217,15 @@ async function exec(context: ActionContextSingle): Promise<boolean | null> {
 		return false
 	}
 
+	const targetDirName = await chooseDestinationName(node.basename)
+	if (targetDirName === null) {
+		return null
+	}
+
 	const url = generateOcsUrl('/apps/extract/api/v1/extraction/execute')
 	const { data: response } = await axios.post<ExtractionResponse>(
 		url,
-		buildRequestBody(node, context.folder),
+		buildRequestBody(node, context.folder, targetDirName),
 	)
 	const extracted = readExtractedFolder(response)
 	if (extracted === null) {
@@ -203,7 +239,7 @@ async function exec(context: ActionContextSingle): Promise<boolean | null> {
 	window.OCP.Files.Router.goToRoute(
 		null,
 		{ view: 'files', fileid: String(extracted.fileId) },
-		{ dir: context.folder.path },
+		{ dir: destinationParentPath(context.folder.path, targetDirName) },
 	)
 
 	return null
@@ -211,7 +247,7 @@ async function exec(context: ActionContextSingle): Promise<boolean | null> {
 
 export const extractAction: IFileAction = {
 	id: 'extract',
-	displayName: () => t('extract', 'Extract here'),
+	displayName: () => t('extract', 'Extract…'),
 	iconSvgInline: () => ArchiveArrowUpSvg,
 	enabled: isEnabled,
 	exec,
@@ -219,7 +255,7 @@ export const extractAction: IFileAction = {
 }
 
 /**
- * Register the "Extract here" file action.
+ * Register the extraction file action.
  */
 // skipcq: JS-0067
 export function registerExtractAction(): void {
