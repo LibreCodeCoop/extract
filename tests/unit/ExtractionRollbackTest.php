@@ -61,7 +61,7 @@ final class ExtractionRollbackTest extends TestCase {
 			$parent->expects(self::once())->method('newFolder')->with('result')->willReturn($target);
 		}
 
-		$userFolder = $this->createStub(Folder::class);
+		$userFolder = $this->createMock(Folder::class);
 		$userFolder->method('get')->with('/')->willReturn($parent);
 		$validator = $this->createStub(IFilenameValidator::class);
 		$validator->method('isFilenameValid')->willReturn(true);

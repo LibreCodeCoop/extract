@@ -264,7 +264,11 @@ final class ExtractionController extends AEnvironmentAwareController {
 
 		// Only a newly created destination belongs entirely to this operation.
 		// Never delete an existing folder, which legacy clients may merge into.
-		$destinationExisted = $this->userFolder->get($directory)->nodeExists($fileName);
+		$parent = $this->userFolder->get($directory);
+		if (!($parent instanceof Folder)) {
+			throw new NotPermittedException('Destination is not a folder');
+		}
+		$destinationExisted = $parent->nodeExists($fileName);
 		$target = $this->destinationFolder($directory, $fileName, $rejectExisting);
 		try {
 			$this->importDirectory($extractTo, $target);
