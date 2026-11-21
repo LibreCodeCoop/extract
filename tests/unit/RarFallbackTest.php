@@ -36,7 +36,7 @@ final class RarFallbackTest extends TestCase {
 		$destination = $directory . '/out';
 		$l10n = $this->createStub(IL10N::class);
 		$l10n->method('t')->willReturnCallback(static fn (string $text): string => $text);
-		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class));
+		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class), $this->createStub(\OCP\IConfig::class));
 
 		try {
 			$result = $service->extractRar($archive, $destination);
