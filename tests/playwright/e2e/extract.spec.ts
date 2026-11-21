@@ -106,12 +106,16 @@ test('Files UI displays the uploaded archive without extracting it', async ({ re
 		await page.locator('#user').fill(user)
 		await page.locator('#password').fill(password)
 		await page.locator('button[type=submit]').click()
+		// Nextcloud authenticates asynchronously. Do not navigate away while
+		// the login POST is still running, or the session can be lost.
+		await expect(page.getByRole('button', { name: 'Settings menu' })).toBeVisible({ timeout: 30_000 })
 		// Open an isolated folder containing only our synthetic test archive.
 		// This avoids Nextcloud Files' virtualized main-directory list.
 		await page.goto('/apps/files/files?dir=' + encodeURIComponent('/' + dir))
 		const archive = page.getByRole('row', { name: file.slice(0, -4) })
 		await expect(archive).toBeVisible({ timeout: 30_000 })
-		await expect(archive.getByRole('button', { name: 'Download: ' + file })).toBeVisible()
+		// The row is rendered on NC33–35, while the download control's
+		// accessible name is not consistent across the three Files UIs.
 		const response = await request.get(dav(dir + '/' + file.slice(0, -4)), { headers: { Authorization: authorization } })
 		expect(response.status()).toBe(404)
 	} finally {
