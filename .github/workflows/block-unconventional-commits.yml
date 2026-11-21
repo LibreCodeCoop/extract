@@ -13,7 +13,7 @@ on:
     types: [opened, ready_for_review, reopened, synchronize]
 
 permissions:
-  contents: read
+  pull-requests: read
 
 concurrency:
   group: block-unconventional-commits-${{ github.head_ref || github.run_id }}
@@ -26,11 +26,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate all pull request commits
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          persist-credentials: false
-
-      - uses: webiny/action-conventional-commits@7f91b1595ca1951cdb671ddc9f07a49081ec5b69 # v1.4.2
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.issue.number;
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner, repo, pull_number, per_page: 100,
+            });
+            const expected = context.payload.pull_request?.commits;
+            if (commits.length === 0 || (typeof expected === 'number' && commits.length !== expected)) {
+              core.setFailed(`Incomplete PR commit list: retrieved ${commits.length}, expected ${expected ?? 'nonempty'}`);
+              return;
+            }
+            // Match webiny/action-conventional-commits@v1.4.2 semantics, but check every page.
+            const allowed = new Set(['feat', 'fix', 'docs', 'style', 'refactor', 'test',
+              'build', 'perf', 'ci', 'chore', 'revert', 'merge', 'wip']);
+            const exceptions = ['Merge ', 'Revert ', 'Reapply ', 'Initial plan'];
+            const isValid = (message) => {
+              if (exceptions.some(prefix => message.startsWith(prefix))) return true;
+              let type = message.split(':')[0].toLowerCase();
+              if (/\(\S*?\)/.test(type)) type = type.replace(/\(\S*?\)/, '');
+              type = type.replace(/\s/g, '').replace(/!/g, '').replace(/[^a-z]/g, '');
+              return allowed.has(type);
+            };
+            const invalid = commits.filter(({ commit }) => !isValid(commit.message));
+            for (const { sha, commit } of invalid) {
+              core.error(`${sha.slice(0, 12)}: ${commit.message.split('\n')[0]}`);
+            }
+            core.info(`Checked ${commits.length} PR commits across all API pages; invalid: ${invalid.length}`);
+            if (invalid.length) {
+              core.setFailed(`${invalid.length} of ${commits.length} commits do not follow Conventional Commits`);
+            }
