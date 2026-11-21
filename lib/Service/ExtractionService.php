@@ -21,19 +21,18 @@ final class ExtractionService {
 	}
 
 	/**
-	 * Reject absolute paths and any ".." path component. Modern libzip
-	 * blocks traversal in ZipArchive::extractTo, but neither unrar nor
-	 * 7za do — a crafted archive can write outside $extractTo.
+	 * Reject archive names that may escape the extraction staging directory,
+	 * including absolute, Windows drive and traversal paths.
 	 */
 	private function isUnsafePath(string $entry): bool {
-		$norm = str_replace('\\', '/', $entry);
-		if ($norm === '' || $norm === '.' || $norm === './') {
-			return false;
-		}
-		if (str_starts_with($norm, '/')) {
+		$path = str_replace('\\', '/', $entry);
+		if (preg_match('/[\x00-\x1f\x7f]/', $entry) === 1) {
 			return true;
 		}
-		return (bool)preg_match('#(^|/)\.\.($|/)#', $norm);
+		if (str_starts_with($path, '/') || preg_match('/^[a-zA-Z]:/', $path) === 1) {
+			return true;
+		}
+		return preg_match('#(^|/)\.\.($|/)#', $path) === 1;
 	}
 
 	/** @return null|array{code: 0, desc: string} */
@@ -41,28 +40,25 @@ final class ExtractionService {
 		if (!$this->isUnsafePath($entry)) {
 			return null;
 		}
-		$this->logger->warning('Refusing archive with unsafe entry: ' . $entry);
-		return [
-			'code' => 0,
-			'desc' => $this->l->t('Archive contains an unsafe path and was not extracted'),
-		];
+		$this->logger->warning('Refusing archive with unsafe entry');
+		return ['code' => 0, 'desc' => $this->l->t('Archive contains an unsafe path and was not extracted')];
 	}
 
-	/** Validate every ZIP entry via libzip indices. @return null|array{code: 0, desc: string} */
+	/** @return null|array{code: 0, desc: string} */
 	private function assertSafeZip(ZipArchive $zip): ?array {
 		for ($i = 0; $i < $zip->numFiles; $i++) {
 			$name = $zip->getNameIndex($i);
 			if ($name === false) {
 				return ['code' => 0, 'desc' => $this->l->t('Failed to read archive index')];
 			}
-			if ($err = $this->rejectUnsafe($name)) {
-				return $err;
+			if ($error = $this->rejectUnsafe($name)) {
+				return $error;
 			}
 		}
 		return null;
 	}
 
-	/** Validate every RAR entry via `unrar lb` (bare list). @return null|array{code: 0, desc: string} */
+	/** @return null|array{code: 0, desc: string} */
 	private function assertSafeRarShell(string $file): ?array {
 		$output = [];
 		$return = 0;
@@ -71,19 +67,15 @@ final class ExtractionService {
 			$this->logger->error('unrar list failed (rc=' . $return . '): ' . implode("\n", $output));
 			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
 		}
-		foreach ($output as $line) {
-			$line = trim($line);
-			if ($line === '') {
-				continue;
-			}
-			if ($err = $this->rejectUnsafe($line)) {
-				return $err;
+		foreach ($output as $entry) {
+			if ($entry !== '' && ($error = $this->rejectUnsafe($entry))) {
+				return $error;
 			}
 		}
 		return null;
 	}
 
-	/** Validate every entry via `7za l -ba -slt`. @return null|array{code: 0, desc: string} */
+	/** @return null|array{code: 0, desc: string} */
 	private function assertSafe7z(string $file): ?array {
 		$output = [];
 		$return = 0;
@@ -93,12 +85,10 @@ final class ExtractionService {
 			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect archive contents')];
 		}
 		foreach ($output as $line) {
-			if (!str_starts_with($line, 'Path = ')) {
-				continue;
-			}
-			$entry = substr($line, 7);
-			if ($err = $this->rejectUnsafe($entry)) {
-				return $err;
+			if (str_starts_with($line, 'Path = ')) {
+				if ($error = $this->rejectUnsafe(substr($line, 7))) {
+					return $error;
+				}
 			}
 		}
 		return null;
@@ -124,9 +114,9 @@ final class ExtractionService {
 			return $response;
 		}
 
-		if ($err = $this->assertSafeZip($zip)) {
+		if ($error = $this->assertSafeZip($zip)) {
 			$zip->close();
-			return $err;
+			return $error;
 		}
 
 		$success = $zip->extractTo($extractTo);
@@ -144,30 +134,45 @@ final class ExtractionService {
 		$response = [];
 
 		if (!extension_loaded('rar')) {
-			if ($err = $this->assertSafeRarShell($file)) {
-				return $err;
+			if ($error = $this->assertSafeRarShell($file)) {
+				return $error;
 			}
 			$output = [];
 			$return = 0;
-			exec('unrar x ' . escapeshellarg($file) . ' -R ' . escapeshellarg($extractTo) . '/ -o+ 2>&1', $output, $return);
+			exec('unrar x ' . escapeshellarg($file) . ' -R ' . escapeshellarg($extractTo) . '/ -o+', $output, $return);
 			if ($return !== 0) {
-				$this->logger->error('unrar extract failed (rc=' . $return . '): ' . implode("\n", $output));
-				$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Failed to extract RAR archive (is the rar extension or unrar installed?)')]);
+				$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Oops something went wrong. Check that you have rar extension or unrar installed')]);
+				$this->logger->error('unrar failed with exit code ' . $return . '. Output: ' . print_r($output, true));
 				return $response;
 			}
 		} else {
 			$rar_file = rar_open($file);
+			if ($rar_file === false) {
+				$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Cannot open Rar file')]);
+				return $response;
+			}
 			$list = rar_list($rar_file);
-			// Pre-validate every entry before extracting any of them.
+			if ($list === false) {
+				rar_close($rar_file);
+			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
+			}
 			foreach ($list as $archive_file) {
-				if ($err = $this->rejectUnsafe($archive_file->getName())) {
+				if ($error = $this->rejectUnsafe($archive_file->getName())) {
 					rar_close($rar_file);
-					return $err;
+					return $error;
 				}
 			}
 			foreach ($list as $archive_file) {
 				$entry = rar_entry_get($rar_file, $archive_file->getName());
-				$entry->extract($extractTo);
+				if ($entry->extract($extractTo) === false) {
+					// A password-protected or damaged entry fails here; without this
+					// check the method reported success and the caller published a
+					// partial result.
+					rar_close($rar_file);
+					$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);
+					$this->logger->error('rar_entry::extract failed for ' . $archive_file->getName());
+					return $response;
+				}
 			}
 			rar_close($rar_file);
 		}
@@ -184,17 +189,20 @@ final class ExtractionService {
 	public function extractOther(string $file, string $extractTo): array {
 		$response = [];
 
-		if ($err = $this->assertSafe7z($file)) {
-			return $err;
+		if ($error = $this->assertSafe7z($file)) {
+			return $error;
 		}
-
 		$output = [];
 		$return = 0;
-		exec('7za -y x ' . escapeshellarg($file) . ' -o' . escapeshellarg($extractTo) . ' 2>&1', $output, $return);
+		exec('7za -y x ' . escapeshellarg($file) . ' -o' . escapeshellarg($extractTo), $output, $return);
 
+		// 7za reports failure through its exit code: 0 on success, 2 on a fatal
+		// error such as a corrupt archive or a missing file, 127 when the
+		// binary itself is absent. The output line count is not a usable signal
+		// because failures print more lines than successes.
 		if ($return !== 0) {
-			$this->logger->error('7za extract failed (rc=' . $return . '): ' . implode("\n", $output));
-			$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Failed to extract archive (is 7-Zip installed?)')]);
+			$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);
+			$this->logger->error('7za failed with exit code ' . $return . '. Is 7-Zip installed? Output: ' . print_r($output, true));
 			return $response;
 		}
 		$response = array_merge($response, ['code' => 1]);
