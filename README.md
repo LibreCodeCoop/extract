@@ -5,7 +5,7 @@
 
 # Extract
 
-[![Latest Release](https://img.shields.io/github/v/release/ashcoft/extract)](https://github.com/ashcoft/extract/releases)
+[![Latest Release](https://img.shields.io/github/v/release/LibreCodeCoop/extract)](https://github.com/LibreCodeCoop/extract/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](COPYING)
 [![Nextcloud Version](https://img.shields.io/badge/Nextcloud-33--35-blue)](https://nextcloud.com)
 [![PHP Version](https://img.shields.io/badge/PHP-8.1%2B-purple)](https://php.net)
@@ -19,7 +19,7 @@ the archive.
 - 🗜️ **Extract in place** from the Files app file action, no shell access needed
 - 🗂️ **Multiple formats**: Zip, Rar, Tar, Tar.gz, Tar.bz2, Gzip, 7z and Deb
 - 📁 **Works with external storage**, including group folders
-- 🔒 **Respects Nextcloud file permissions** and removes blacklisted file names
+- 🔒 **Imports files through Nextcloud's files API**, checking destination permissions and rejecting symbolic links
 - 🧹 **Cleans up** a temporary directory left behind by an interrupted run
 - 🔌 **Capabilities API** so clients can discover the supported archive types
 - 🌍 **Translated** through the Nextcloud translation pipeline
@@ -41,6 +41,9 @@ the archive.
 | PHP `zip` extension | Zip archives | bundled with most PHP builds |
 | PHP `rar` extension **or** `unrar` | Rar archives | `pecl install rar` **or** `apt-get install unrar` |
 | `p7zip` / `p7zip-full` | Tar, Gzip, Bzip2, 7z, Deb | `apt-get install p7zip p7zip-full` |
+
+Extraction needs enough free space in the server's temporary directory for the
+uncompressed archive. Symbolic links in archives are not supported.
 
 The `zip` PHP extension is required for Zip files. Rar needs either the PHP
 `rar` extension or the `unrar` binary; every other format is handled by the
@@ -72,7 +75,7 @@ brew install p7zip
 ### From a release archive (recommended)
 
 1. Download the latest `extract.tar.gz` (or `extract.zip`) from the
-   [releases page](https://github.com/ashcoft/extract/releases).
+   [releases page](https://github.com/LibreCodeCoop/extract/releases).
 2. Extract it into your Nextcloud `apps` directory, using the command that
    matches the archive you downloaded:
    ```bash
@@ -96,7 +99,7 @@ brew install p7zip
 1. Clone the repository into your Nextcloud `apps` directory:
    ```bash
    cd /path/to/nextcloud/apps
-   git clone https://github.com/ashcoft/extract.git extract
+   git clone https://github.com/LibreCodeCoop/extract.git extract
    ```
 
 2. Set the permissions:
@@ -166,7 +169,7 @@ interrupted, that temporary folder is removed before the new extraction starts.
 ### Setup
 
 ```bash
-git clone https://github.com/ashcoft/extract.git
+git clone https://github.com/LibreCodeCoop/extract.git
 cd extract
 composer install
 npm ci
@@ -199,7 +202,7 @@ make dist               # build the source package and the app-store archives
 `make appstore` stages only the runtime files, then writes
 `build/artifacts/extract.tar.gz` and, when `zip` is installed,
 `build/artifacts/extract.zip`. Without `zip` it skips the zip with a warning;
-the release workflow installs `zip` so both archives are always attached.
+install `zip` when both archive formats are required.
 
 It packages whatever is already in `js/` and `css/`, and it does not build the
 frontend itself, so run `make build` first on a fresh checkout. `make dist` is
@@ -228,18 +231,10 @@ the mapping between Nextcloud's archive MIME types and the extraction strategy.
 
 ## 🚢 Releases
 
-Releases are automated. On every push to `main` the `Release` workflow:
-
-1. runs [semantic-release](https://semantic-release.gitbook.io/) to decide the
-   next version from the commit messages,
-2. bumps `appinfo/info.xml` and `package.json`, commits the change and creates
-   the tag,
-3. builds `extract.tar.gz` and `extract.zip` from the tagged commit,
-4. uploads both archives to the GitHub release and publishes it.
-
-Because the version comes from the tags, `appinfo/info.xml` must never be ahead
-of the latest tag. If it is, the workflow stops and tells you to tag the current
-commit so the next release continues from the declared version.
+Official releases are tracked in the [LibreCodeCoop/extract repository](https://github.com/LibreCodeCoop/extract/releases).
+The source build can be packaged with `make build` followed by `make appstore`.
+A release must only be published after review and validation; this contribution does
+not introduce automatic release publishing.
 
 ## 🐛 Troubleshooting
 
@@ -336,7 +331,7 @@ later - see the [COPYING](COPYING) file for details.
 
 ## 🔗 Links
 
-- **Repository**: https://github.com/ashcoft/extract
-- **Releases**: https://github.com/ashcoft/extract/releases
+- **Repository**: https://github.com/LibreCodeCoop/extract
+- **Releases**: https://github.com/LibreCodeCoop/extract/releases
 - **Upstream**: https://github.com/LibreCodeCoop/extract
 - **Original author**: Paul Lereverend

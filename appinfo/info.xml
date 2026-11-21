@@ -37,9 +37,9 @@
     <namespace>Extract</namespace>
     <category>files</category>
     <category>tools</category>
-    <website>https://github.com/PaulLereverend/NextcloudExtract</website>
-    <bugs>https://github.com/PaulLereverend/NextcloudExtract/issues</bugs>
-    <screenshot>https://raw.githubusercontent.com/PaulLereverend/NextcloudExtract/master/img/extract.png</screenshot>
+    <website>https://github.com/LibreCodeCoop/extract</website>
+    <bugs>https://github.com/LibreCodeCoop/extract/issues</bugs>
+    <screenshot>https://raw.githubusercontent.com/LibreCodeCoop/extract/main/img/extract.png</screenshot>
     <dependencies>
         <nextcloud min-version="33" max-version="35"/>
     </dependencies>
