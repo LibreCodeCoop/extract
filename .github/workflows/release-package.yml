@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: 2026 LibreCode coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: Verify release package
+
+on:
+  pull_request:
+    branches: [main, stable33, stable34, stable35]
+  push:
+    branches: [main, stable33, stable34, stable35]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: release-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout application
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Set up PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.5'
+          extensions: curl, dom, mbstring, xml, zip
+          coverage: none
+      - name: Install packaging tools
+        run: sudo apt-get update -qq && sudo apt-get install -qq -y rsync
+      - name: Compile production assets
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+      - name: Validate Composer and production dependency boundary
+        run: |
+          set -euo pipefail
+          composer validate --strict
+          composer install --no-dev --prefer-dist --no-interaction --no-progress
+          test ! -e vendor/phpunit/phpunit || {
+            echo "::error::PHPUnit must not be present in a production install"
+            exit 1
+          }
+      - name: Verify package
+        run: |
+          set -euo pipefail
+          make appstore
+          make verify-appstore-package
+      - name: Download verified Release Tool
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/release-tool"
+          gh release download v0.12.0 \
+            --repo LibreCodeCoop/release-tool \
+            -p release-tool.phar -p release-tool.phar.sha256 \
+            -D "$RUNNER_TEMP/release-tool"
+          (cd "$RUNNER_TEMP/release-tool" && sha256sum -c release-tool.phar.sha256)
+          php "$RUNNER_TEMP/release-tool/release-tool.phar" config:validate \
+            --config .nextcloud-release.yml --root . --json
+      - name: Upload validated artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: extract-release-package
+          path: build/artifacts/extract.tar.gz
+          if-no-files-found: error
+          retention-days: 7

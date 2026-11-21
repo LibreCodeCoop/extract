@@ -8,29 +8,29 @@
 [![Latest Release](https://img.shields.io/github/v/release/LibreCodeCoop/extract)](https://github.com/LibreCodeCoop/extract/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](COPYING)
 [![Nextcloud Version](https://img.shields.io/badge/Nextcloud-33--35-blue)](https://nextcloud.com)
-[![PHP Version](https://img.shields.io/badge/PHP-8.1%2B-purple)](https://php.net)
+[![PHP Version](https://img.shields.io/badge/PHP-8.3--8.5-purple)](https://php.net)
 
 Extract archives from the Nextcloud web interface. Pick an archive in the Files
-app, choose **Extract here**, and the app unpacks it into a new folder next to
-the archive.
+app, choose **Extract…** and enter a new folder name or a relative path inside
+the archive directory.
 
 ## ✨ Features
 
-- 🗜️ **Extract in place** from the Files app file action, no shell access needed
+- 🗜️ **Choose an extraction destination** from the Files action, no shell access needed
 - 🗂️ **Multiple formats**: Zip, Rar, Tar, Tar.gz, Tar.bz2, Gzip, 7z and Deb
 - 📁 **Works with external storage**, including group folders
 - 🔒 **Imports files through Nextcloud's files API**, checking destination permissions and rejecting symbolic links
 - 🧹 **Cleans up** a temporary directory left behind by an interrupted run
 - 🔌 **Capabilities API** so clients can discover the supported archive types
 - 🌍 **Translated** through the Nextcloud translation pipeline
-- 🧪 **Unit tested** and compatible with Nextcloud 33-35
+- 🧪 **Unit tested with Playwright integration coverage** for Nextcloud 33–35
 
 ## 📋 Requirements
 
 | Component | Version |
 |-----------|---------|
 | Nextcloud | 33-35 |
-| PHP       | 8.1+ |
+| PHP       | 8.3–8.5 |
 | Node.js   | 24+ (development only) |
 | npm       | 10.5+ (development only) |
 
@@ -69,8 +69,8 @@ brew install p7zip
 
 ## 📦 Installation
 
-> **Note:** Extract is not listed in the Nextcloud App Store. Install it from a
-> release archive or from source as described below.
+> **Note:** Release archives must be built, verified and signed by the publishing workflow.
+> Use verified release assets rather than unreviewed source snapshots.
 
 ### From a release archive (recommended)
 
@@ -125,12 +125,12 @@ brew install p7zip
 ## 🚀 Usage
 
 1. Open the **Files** app and navigate to an archive.
-2. Right-click the archive and choose **Extract here**.
-3. The app unpacks the archive into a new folder named after the archive, in the
-   same directory.
+2. Right-click the archive and choose **Extract…**.
+3. Choose a new folder name or nested relative path and confirm. The default is
+   derived from the archive name; cancelling does not extract anything.
 
-The action is only offered when you have permission to change the file, and only
-for archives whose MIME type the app can extract.
+The action is offered for readable archives when you can create files in their
+parent folder. Extraction never modifies the archive itself.
 
 ### Supported formats
 
@@ -335,3 +335,9 @@ later - see the [COPYING](COPYING) file for details.
 - **Releases**: https://github.com/LibreCodeCoop/extract/releases
 - **Upstream**: https://github.com/LibreCodeCoop/extract
 - **Original author**: Paul Lereverend
+
+## Release and test automation
+
+See [release procedures](docs/RELEASING.md) for Nextcloud 33–35 release
+branches, the PHP matrix, Playwright, reproducible package validation and
+LibreCode Release Tool automation.

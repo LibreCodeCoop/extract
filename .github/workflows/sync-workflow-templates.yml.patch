@@ -1,11 +1,10 @@
 --- a/.github/workflows/sync-workflow-templates.yml
 +++ b/.github/workflows/sync-workflow-templates.yml
-@@ -147,7 +147,8 @@
-         with:
+@@ -148,6 +148,7 @@
            source: source/workflow-templates
            target: target
            catalog-commit: ${{ steps.catalog-revision.outputs.sha }}
-+          include: npm-audit-fix.yml,block-unconventional-commits.yml,lint-info-xml.yml,reuse.yml
++          include: npm-audit-fix.yml,block-unconventional-commits.yml,lint-info-xml.yml,reuse.yml,prepare-release.yml,appstore-build-publish.yml
  
        - name: Create Pull Request
          if: ${{ steps.sync.outputs.changed == 'true' }}

@@ -1,0 +1,36 @@
+# This workflow is provided via the organization template repository
+#
+# https://github.com/LibreCodeCoop/.github
+# https://docs.github.com/en/actions/learn-github-actions/sharing-workflows-with-your-organization
+#
+# SPDX-FileCopyrightText: 2021-2026 Nextcloud GmbH, LibreCode coop and contributors
+# SPDX-License-Identifier: MIT
+
+name: Build and publish app release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to build and publish.
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build_and_publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build and publish release
+        uses: LibreCodeCoop/.github/actions/nextcloud-appstore-publish@8828d1047c31ac1c6bf1998436b2a73e7e5c6288 # PHP 8.5 publisher
+        with:
+          app-name: ${{ github.event.repository.name }}
+          release-tag: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.release.tag_name }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          app-private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          appstore-token: ${{ secrets.APPSTORE_TOKEN }}
+          manual-recovery: ${{ github.event_name == 'workflow_dispatch' }}
