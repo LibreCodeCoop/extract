@@ -11,6 +11,8 @@ import { emit } from '@nextcloud/event-bus'
 import { Folder, Permission, registerFileAction } from '@nextcloud/files'
 import { translate as t } from '@nextcloud/l10n'
 import { generateOcsUrl } from '@nextcloud/router'
+import { createApp } from 'vue'
+import ExtractionDialog from '../components/ExtractionDialog.vue'
 
 /**
  * MIME types the backend can extract.
@@ -146,15 +148,61 @@ function readExtractedFolder(response: ExtractionResponse): ExtractedFolder | nu
  *
  * @param node The archive to extract
  * @param folder The folder the archive lives in
+ * @param targetDirName Selected relative destination
  */
 // skipcq: JS-0067
-function buildRequestBody(node: INode, folder: IFolder) {
+function buildRequestBody(node: INode, folder: IFolder, targetDirName: string) {
 	return {
 		nameOfFile: node.basename,
 		directory: folder.path,
 		external: isExternalStorage(node) ? 1 : 0,
 		mime: archiveMimeOf(node),
+		targetDirName,
 	}
+}
+
+/**
+ * Suggest a destination while preserving extensions inside the archive's name.
+ *
+ * Match the server's resultFolderName logic for wrapped tarballs and .tar;
+ * files like backup.2026.zip must retain their middle extension.
+ *
+ * @param fileName Name of the archive
+ */
+function suggestedDestinationName(fileName: string): string {
+	const lower = fileName.toLowerCase()
+	for (const extension of ['tar.gz', 'tgz', 'tar.bz2', 'tbz', 'tbz2', 'tar.xz', 'txz', 'tar']) {
+		if (lower.endsWith('.' + extension)) {
+			return fileName.slice(0, -(extension.length + 1))
+		}
+	}
+	const dot = fileName.lastIndexOf('.')
+	return dot < 0 ? fileName : fileName.slice(0, dot)
+}
+
+/**
+ * Display a native Nextcloud dialog and return the confirmed relative path.
+ *
+ * A cancelled dialog must resolve to null, not trigger the Files error toast.
+ *
+ * @param fileName Name of the archive
+ */
+async function chooseDestinationName(fileName: string): Promise<string | null> {
+	return new Promise((resolve) => {
+		const mount = document.createElement('div')
+		document.body.append(mount)
+		const app = createApp(ExtractionDialog, {
+			initialName: suggestedDestinationName(fileName),
+			onFinish: (value: string | null) => {
+				resolve(value)
+				window.setTimeout(() => {
+					app.unmount()
+					mount.remove()
+				}, 350)
+			},
+		})
+		app.mount(mount)
+	})
 }
 
 /**
@@ -186,10 +234,15 @@ async function exec(context: ActionContextSingle): Promise<boolean | null> {
 		return false
 	}
 
+	const targetDirName = await chooseDestinationName(node.basename)
+	if (targetDirName === null) {
+		return null
+	}
+
 	const url = generateOcsUrl('/apps/extract/api/v1/extraction/execute')
 	const { data: response } = await axios.post<ExtractionResponse>(
 		url,
-		buildRequestBody(node, context.folder),
+		buildRequestBody(node, context.folder, targetDirName),
 	)
 	const extracted = readExtractedFolder(response)
 	if (extracted === null) {
@@ -211,7 +264,7 @@ async function exec(context: ActionContextSingle): Promise<boolean | null> {
 
 export const extractAction: IFileAction = {
 	id: 'extract',
-	displayName: () => t('extract', 'Extract here'),
+	displayName: () => t('extract', 'Extract…'),
 	iconSvgInline: () => ArchiveArrowUpSvg,
 	enabled: isEnabled,
 	exec,
