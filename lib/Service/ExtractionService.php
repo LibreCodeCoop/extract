@@ -76,12 +76,13 @@ final class ExtractionService {
 	}
 
 	/** @return null|array{code: 0, desc: string} */
-	private function assertSafe7z(string $file): ?array {
+	private function assertSafe7z(string $file, bool $useFullSevenZip = false): ?array {
 		$output = [];
 		$return = 0;
-		exec('7za l -ba -slt ' . escapeshellarg($file) . ' 2>&1', $output, $return);
+		$binary = $useFullSevenZip ? '7z' : '7za';
+		exec($binary . ' l -ba -slt ' . escapeshellarg($file) . ' 2>&1', $output, $return);
 		if ($return !== 0) {
-			$this->logger->error('7za list failed (rc=' . $return . '): ' . implode("\n", $output));
+			$this->logger->error($binary . ' list failed (rc=' . $return . '): ' . implode("\n", $output));
 			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect archive contents')];
 		}
 		foreach ($output as $line) {
@@ -92,6 +93,37 @@ final class ExtractionService {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Use the full 7z binary as an alternate RAR decoder on distributions that
+	 * cannot install the unrar command or the PHP rar extension.
+	 */
+	private function extractRarWithSevenZip(string $file, string $extractTo): array {
+		if (!$this->isCommandAvailable('7z')) {
+			return ['code' => 0, 'desc' => $this->l->t('RAR extraction requires unrar, the PHP rar extension, or the full 7z binary')];
+		}
+		if ($error = $this->assertSafe7z($file, true)) {
+			return $error;
+		}
+		$output = [];
+		$return = 0;
+		exec('7z -y x ' . escapeshellarg($file) . ' -o' . escapeshellarg($extractTo) . ' 2>&1', $output, $return);
+		if ($return !== 0) {
+			$this->logger->error('RAR extraction via 7z failed (rc=' . $return . '): ' . implode("\n", $output));
+			return ['code' => 0, 'desc' => $this->l->t('Could not extract RAR archive')];
+		}
+		return ['code' => 1];
+	}
+
+	/**
+	 * Check for a fixed, known external archive utility before invocation.
+	 */
+	private function isCommandAvailable(string $binary): bool {
+		$return = 0;
+		$output = [];
+		exec('command -v ' . escapeshellarg($binary) . ' >/dev/null 2>&1', $output, $return);
+		return $return === 0;
 	}
 
 	/**
@@ -134,6 +166,9 @@ final class ExtractionService {
 		$response = [];
 
 		if (!extension_loaded('rar')) {
+			if (!$this->isCommandAvailable('unrar')) {
+				return $this->extractRarWithSevenZip($file, $extractTo);
+			}
 			if ($error = $this->assertSafeRarShell($file)) {
 				return $error;
 			}
