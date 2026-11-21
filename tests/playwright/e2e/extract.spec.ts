@@ -5,7 +5,7 @@
 
 import type { APIRequestContext } from '@playwright/test'
 
-import { expect, test } from '@playwright/test'
+import { expect, request as apiRequest, test } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -302,6 +302,12 @@ test('A share recipient can extract a ZIP to a writable shared folder', async ({
 	const recipient = 'extractci' + randomUUID().replaceAll('-', '').slice(0, 12)
 	const recipientPassword = 'ExtractCI!' + randomUUID().replaceAll('-', '')
 	const recipientAuthorization = 'Basic ' + Buffer.from(recipient + ':' + recipientPassword).toString('base64')
+	// Each user needs an independent cookie jar: Nextcloud creates sessions even
+	// when Basic authorization is sent on the original OCS request context.
+	const recipientRequest = await apiRequest.newContext({
+		baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:18135',
+		extraHTTPHeaders: { Authorization: recipientAuthorization, 'OCS-APIRequest': 'true' },
+	})
 	const dir = 'extract-shared-' + randomUUID().slice(0, 8)
 	const archiveName = 'uploaded-by-recipient.zip'
 	let userCreated = false
@@ -332,7 +338,7 @@ test('A share recipient can extract a ZIP to a writable shared folder', async ({
 		const shareData = await share.json()
 		expect([100, 200]).toContain(shareData.ocs.meta.statuscode)
 
-		const uploaded = await request.put(davFor(recipient, dir + '/' + archiveName), {
+		const uploaded = await recipientRequest.put(davFor(recipient, dir + '/' + archiveName), {
 			headers: { Authorization: recipientAuthorization, 'Content-Type': 'application/zip' },
 			data: fixture,
 		})
@@ -345,8 +351,8 @@ test('A share recipient can extract a ZIP to a writable shared folder', async ({
 		})
 		expect(ownerArchive.status(), 'Owner should see an ordinary upload in the shared folder').toBe(200)
 
-		const response = await request.post(extractEndpoint, {
-			headers: { ...apiHeaders, Authorization: recipientAuthorization },
+		const response = await recipientRequest.post(extractEndpoint, {
+			headers: { Accept: 'application/json' },
 			data: {
 				nameOfFile: archiveName,
 				directory: '/' + dir,
@@ -359,16 +365,21 @@ test('A share recipient can extract a ZIP to a writable shared folder', async ({
 		const result = await response.json()
 		expect(result.ocs.data.code).toBe(1)
 
-		for (const [account, auth] of [[recipient, recipientAuthorization], [user, authorization]]) {
+		const contexts: Array<[string, APIRequestContext, string]> = [
+			[recipient, recipientRequest, recipientAuthorization],
+			[user, request, authorization],
+		]
+		for (const [account, context, auth] of contexts) {
 			const path = davFor(account, dir + '/recipient-extracted/hello.txt')
 			await expect.poll(async () => {
-				const file = await request.get(path, { headers: { Authorization: auth } })
+				const file = await context.get(path, { headers: { Authorization: auth } })
 				return file.status()
 			}, { timeout: 12_000, message: `Extracted file must be visible to ${account}` }).toBe(200)
-			const extracted = await request.get(path, { headers: { Authorization: auth } })
+			const extracted = await context.get(path, { headers: { Authorization: auth } })
 			expect(await extracted.text()).toBe('Extract browser E2E passed\n')
 		}
 	} finally {
+		await recipientRequest.dispose()
 		if (folderCreated) {
 			await deleteFile(request, dir)
 		}
