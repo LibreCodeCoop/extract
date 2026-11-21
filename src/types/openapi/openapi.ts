@@ -81,7 +81,7 @@ export interface operations {
                     nameOfFile: string;
                     /** @description Directory where the file is located */
                     directory: string;
-                    /** @description Is the file located on an external storage? */
+                    /** @description Retained for backward compatibility; storage is resolved server-side. */
                     external: boolean;
                     /** @description MIME type of the file */
                     mime: string;
