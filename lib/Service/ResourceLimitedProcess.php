@@ -76,7 +76,10 @@ final class ResourceLimitedProcess {
 				if ($process->hasExited() && ($maxOutputBytes === null || $process->outputComplete())) {
 					break;
 				}
-				usleep(self::POLL_INTERVAL_US);
+				// A verbose decoder can fill the pipe much faster than a 50 ms
+				// polling cadence allows it to be drained. Keep reading promptly
+				// while data flows; retain the slower cadence when idle.
+				usleep($process->hadOutput() ? 1000 : self::POLL_INTERVAL_US);
 			}
 		} catch (\Throwable) {
 			$reason = 'inspection';
