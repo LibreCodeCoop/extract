@@ -54,6 +54,11 @@ final class ExtractionController extends AEnvironmentAwareController {
 		'application/x-bzip2' => 'other',
 		'application/x-deb' => 'other',
 		'application/x-compressed' => 'other',
+		'application/x-xz' => 'other',
+		'application/x-xz-compressed-tar' => 'other',
+		'application/zstd' => 'zstd',
+		'application/x-zstd' => 'zstd',
+		'application/x-zstd-compressed-tar' => 'zstd',
 	];
 
 	/**
@@ -64,7 +69,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 	 * expands it in a single pass, so treating it as wrapped would make the
 	 * controller look for a second archive inside the extracted payload.
 	 */
-	private const WRAPPED_TARBALL_EXTENSIONS = ['tar.gz', 'tgz', 'tar.bz2', 'tbz', 'tbz2', 'tar.xz', 'txz'];
+	private const WRAPPED_TARBALL_EXTENSIONS = ['tar.gz', 'tgz', 'tar.bz2', 'tbz', 'tbz2', 'tar.xz', 'txz', 'tar.zst', 'tar.zstd', 'tzst'];
 
 	/** @var Folder */
 	private $userFolder;
@@ -176,12 +181,14 @@ final class ExtractionController extends AEnvironmentAwareController {
 	 * @param string $extractTo The local file-system path of the destination.
 	 * @return array{code: 0|1, desc?: string}
 	 */
-	private function extractWrappedTarball(string $file, string $extractTo, ?int $availableBytes = null): array {
+	private function extractWrappedTarball(string $file, string $extractTo, ?int $availableBytes = null, bool $zstd = false, ?string $archiveName = null): array {
 		// A unique scratch directory: a predictable sibling name could collide
 		// with, and then delete, an unrelated folder in the same directory.
 		$scratch = $extractTo . '.unwrapped.' . bin2hex(random_bytes(8));
 
-		$response = $this->extractionService->extractOther($file, $scratch, $availableBytes);
+		$response = $zstd
+			? $this->extractionService->extractZstd($file, $scratch, $availableBytes, $archiveName)
+			: $this->extractionService->extractOther($file, $scratch, $availableBytes);
 		if (($response['code'] ?? 0) === 0) {
 			$this->removeDirectory($scratch);
 			return $response;
@@ -535,6 +542,13 @@ final class ExtractionController extends AEnvironmentAwareController {
 				break;
 			case 'rar':
 				$response = $this->extractionService->extractRar($file, $extractTo, $destinationParent->getFreeSpace());
+				break;
+			case 'zstd':
+				if (self::isWrappedTarball($nameOfFile)) {
+					$response = $this->extractWrappedTarball($file, $extractTo, $destinationParent->getFreeSpace(), true, $nameOfFile);
+				} else {
+					$response = $this->extractionService->extractZstd($file, $extractTo, $destinationParent->getFreeSpace(), $nameOfFile);
+				}
 				break;
 			default:
 				if (self::isWrappedTarball($nameOfFile) === true) {
