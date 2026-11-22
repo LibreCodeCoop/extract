@@ -20,6 +20,7 @@ version:
 
 history:
   previous_release: reachable-tag
+  initial_ref: b1252308a867580bdef509b4418b66de17352e25
 
 changelog:
   strategy: per-major
