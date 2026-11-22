@@ -45,6 +45,8 @@ the archive directory.
 Extraction needs enough free space in the server's temporary directory for the
 uncompressed archive. Symbolic links in archives are not supported.
 
+External decoders require PHP `proc_open` to be enabled; if it is disabled,
+extraction fails closed rather than falling back to unsupervised `exec()`.
 ZIP extraction enforces the destination's available Nextcloud quota, staging
 disk free space, and two configurable safety limits (defaults: **2 GiB** total
 uncompressed bytes and **10,000** entries). The limits apply before extraction
@@ -60,8 +62,18 @@ The same configured limits and destination-space estimates are now checked
 against the *declared* contents of archives handled by `7za` (7z, tar,
 Gzip, Bzip2 and Deb) **before** launching their extraction. Unlike the ZIP
 streaming path, an external decoder may expand beyond dishonest archive
-metadata before the app can stop it; this is a preflight safeguard and not
-a process-level disk quota. RAR decoding still needs separate resource bounds.
+metadata before the app can stop it. Command-line decoders now run under a
+best-effort supervisor that periodically measures the staging directory,
+interrupts processes that exceed the configured size or entry budget, and
+enforces a default **300-second** timeout. Administrators can change it with
+`occ config:app:set extract max_extraction_seconds --value=600`.
+Checks are periodic and can be exceeded briefly; this is **not** a strict
+filesystem quota. High-risk deployments should isolate temporary storage
+with an operating-system-enforced limit. When available, the supervisor
+runs command-line decoders in their own POSIX session and terminates remaining
+child processes on completion or failure. The PHP `rar` extension follows a
+separate bounded streaming path with CRC checks rather than spawning a decoder,
+but it still cannot provide an operating-system-enforced CPU or disk quota.
 
 The `zip` PHP extension is required for Zip files. Rar needs either the PHP
 `rar` extension or the `unrar` binary; every other format is handled by the

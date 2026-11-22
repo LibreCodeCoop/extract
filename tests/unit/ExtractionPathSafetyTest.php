@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OCA\Extract\Tests\unit;
 
+use OCA\Extract\Service\ArchiveSafetyValidator;
 use OCA\Extract\Service\ExtractionService;
 use OCP\IL10N;
 use PHPUnit\Framework\TestCase;
@@ -23,14 +24,15 @@ final class ExtractionPathSafetyTest extends TestCase {
 	}
 
 	public function testUnsafeArchiveEntryNamesAreRejected(): void {
-		$method = new \ReflectionMethod(ExtractionService::class, 'isUnsafePath');
-		$service = $this->service();
+		$l10n = $this->createStub(IL10N::class);
+		$l10n->method('t')->willReturnCallback(static fn (string $s): string => $s);
+		$validator = new ArchiveSafetyValidator($l10n, $this->createStub(LoggerInterface::class));
 
 		foreach (['../escape.txt', 'a/../../escape.txt', '..\\escape.txt', '/etc/passwd', '\\\\server\\share', 'C:\\outside.txt', 'C:relative.txt', "a\x00b"] as $entry) {
-			self::assertTrue($method->invoke($service, $entry), 'Unsafe path accepted: ' . bin2hex($entry));
+			self::assertSame(0, $validator->rejectUnsafe($entry)['code'], 'Unsafe path accepted: ' . bin2hex($entry));
 		}
 		foreach (['safe.txt', 'nested/file.txt', 'nested\\file.txt', 'a/..name.txt', './inside.txt'] as $entry) {
-			self::assertFalse($method->invoke($service, $entry), 'Safe path rejected: ' . $entry);
+			self::assertNull($validator->rejectUnsafe($entry), 'Safe path rejected: ' . $entry);
 		}
 	}
 

@@ -235,6 +235,13 @@ final class ExtractionServiceTest extends TestCase {
 		self::assertSame(str_repeat('x', 256), file_get_contents($allowed . '/payload.txt'));
 	}
 
+
+
+
+
+
+
+
 	/**
 	 * A decompression bomb must be refused before staging any files when the
 	 * total uncompressed content cannot fit the user's Nextcloud quota.
