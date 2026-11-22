@@ -1,15 +1,14 @@
 OC.L10N.register(
     "extract",
     {
-    "Encryption is not supported yet" : "尚不支援加密",
+    "Oops something went wrong." : "糟糕，出了點問題。",
     "File not found" : "找不到檔案",
     "Zip extension is not available" : "Zip 擴充元件不可用",
     "Cannot open Zip file" : "無法開啟 Zip 檔案",
     "Oops something went wrong. Check that you have rar extension or unrar installed" : "哎呀！好像發生了一點問題。請檢查您是否有 rar 擴充元件或是否安裝了 unrar",
-    "Oops something went wrong." : "糟糕，出了點問題。",
     "Extract" : "解壓縮",
     "Extract archive from the web interface" : "從網頁介面解壓縮檔案",
-    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "解壓縮檔案。\n\n*  **支援：** \n\n    * Zip \n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **需求：** \n    * Rar PHP 擴充元件  (pecl -v install rar)\n\n    * **或** \n    * unrar (sudo apt-get install unrar)\n\n    * **及**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **注意：** 尚不支援已加密檔案",
-    "Extract here" : "在此解壓縮"
+    "Folder name" : "資料夾名稱",
+    "Cancel" : "取消"
 },
 "nplurals=1; plural=0;");

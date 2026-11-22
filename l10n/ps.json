@@ -1,4 +1,5 @@
 { "translations": {
-    "File not found" : "فایل نشته"
+    "File not found" : "فایل نشته",
+    "Cancel" : "Cancel"
 },"pluralForm" :"nplurals=2; plural=(n != 1);"
 }

@@ -1,4 +1,6 @@
 { "translations": {
-    "File not found" : "Fann ikkje fila"
+    "File not found" : "Fann ikkje fila",
+    "Folder name" : "Mappenamn",
+    "Cancel" : "Avbryt"
 },"pluralForm" :"nplurals=2; plural=(n != 1);"
 }

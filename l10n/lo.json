@@ -1,4 +1,6 @@
 { "translations": {
-    "File not found" : "File not found"
+    "File not found" : "File not found",
+    "Folder name" : "ຊື່ໂຟນເດີ",
+    "Cancel" : "Cancel"
 },"pluralForm" :"nplurals=1; plural=0;"
 }
