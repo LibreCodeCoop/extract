@@ -24,7 +24,7 @@ final class ArchiveSafetyValidatorTest extends TestCase {
 	}
 
 	public function testRejectsTraversalAndAbsoluteNames(): void {
-		foreach (['../outside', 'a/../../outside', '/etc/passwd', 'C:\\\\Windows\\\\secret', 'some/..\\\\outside', "bad\\0name"] as $name) {
+		foreach (['../outside', 'a/../../outside', '/etc/passwd', 'C:\\\\Windows\\\\secret', 'some/..\\\\outside', "bad\0name"] as $name) {
 			self::assertSame(0, $this->validator->rejectUnsafe($name)['code'], $name);
 		}
 	}

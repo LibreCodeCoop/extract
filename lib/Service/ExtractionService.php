@@ -21,6 +21,7 @@ final class ExtractionService {
 
 	private ArchiveSafetyValidator $safety;
 	private ExtractionLimits $limits;
+	private BoundedStreamCopier $copier;
 
 	public function __construct(
 		private IL10N $l,
@@ -29,6 +30,7 @@ final class ExtractionService {
 	) {
 		$this->safety = new ArchiveSafetyValidator($l, $logger);
 		$this->limits = new ExtractionLimits($config);
+		$this->copier = new BoundedStreamCopier();
 	}
 
 
@@ -239,31 +241,8 @@ final class ExtractionService {
 					return ['code' => 0, 'desc' => $this->l->t('Could not extract Zip archive')];
 				}
 				try {
-					$output = fopen($path, 'wb');
-					if ($output === false) {
+					if (!$this->copier->copy($input, $path, $written, $limit)) {
 						return ['code' => 0, 'desc' => $this->l->t('Could not extract Zip archive')];
-					}
-					try {
-						while (!feof($input)) {
-							$chunk = fread($input, 65536);
-							if ($chunk === false || ($chunk === '' && !feof($input))) {
-								return ['code' => 0, 'desc' => $this->l->t('Could not extract Zip archive')];
-							}
-							if (strlen($chunk) > $limit - $written) {
-								return ['code' => 0, 'desc' => $this->l->t('Archive exceeds the allowed extraction size')];
-							}
-							$written += strlen($chunk);
-							$offset = 0;
-							while ($offset < strlen($chunk)) {
-								$count = fwrite($output, substr($chunk, $offset));
-								if ($count === false || $count === 0) {
-									return ['code' => 0, 'desc' => $this->l->t('Could not extract Zip archive')];
-								}
-								$offset += $count;
-							}
-						}
-					} finally {
-						fclose($output);
 					}
 				} finally {
 					fclose($input);
@@ -344,52 +323,7 @@ final class ExtractionService {
 	 *
 	 * @psalm-return array{code: 0|1, desc?: string}
 	 */
-	/**
-	 * Stream a RAR entry into staging with strict per-entry and total-byte
-	 * limits. Unlike RarEntry::extract(), PHP controls every output path.
-	 *
-	 * @param resource $input
-	 */
-	private function copyRarStream($input, string $target, int $expectedBytes, string $expectedCrc, int &$written, int $budget, int $deadline): bool {
-		$output = fopen($target, 'xb');
-		if ($output === false) {
-			return false;
-		}
-		$size = 0;
-		$hash = hash_init('crc32b');
-		try {
-			while (!feof($input)) {
-				if (hrtime(true) >= $deadline) {
-					return false;
-				}
-				$chunk = fread($input, 65536);
-				if ($chunk === false || ($chunk === '' && !feof($input))) {
-					return false;
-				}
-				$length = strlen($chunk);
-				if ($length > $budget - $written || $length > $expectedBytes - $size) {
-					return false;
-				}
-				$offset = 0;
-				while ($offset < $length) {
-					if (hrtime(true) >= $deadline) {
-						return false;
-					}
-					$count = fwrite($output, substr($chunk, $offset));
-					if ($count === false || $count === 0) {
-						return false;
-					}
-					$offset += $count;
-				}
-				hash_update($hash, $chunk);
-				$size += $length;
-				$written += $length;
-			}
-		} finally {
-			fclose($output);
-		}
-		return $size === $expectedBytes && hash_equals(strtolower($expectedCrc), hash_final($hash));
-	}
+
 
 	/**
 	 * The PHP RAR extension must not bypass quota checks or create archive
@@ -477,7 +411,7 @@ final class ExtractionService {
 					return ['code' => 0, 'desc' => $this->l->t('Could not read RAR entry')];
 				}
 				try {
-					if (!$this->copyRarStream($input, $target, $entry->getUnpackedSize(), $crc, $written, $budget, $deadline)) {
+					if (!$this->copier->copy($input, $target, $written, $budget, $entry->getUnpackedSize(), $crc, $deadline)) {
 						return ['code' => 0, 'desc' => $this->l->t('RAR extraction exceeded limits or failed integrity verification')];
 					}
 				} finally {
