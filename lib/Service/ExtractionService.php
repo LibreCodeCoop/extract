@@ -44,4 +44,9 @@ final class ExtractionService {
 	public function extractOther(string $file, string $extractTo, ?int $availableBytes = null): array {
 		return $this->cli->extractOther($file, $extractTo, $availableBytes);
 	}
+
+	/** @return array{code: 0|1, desc?: string} */
+	public function extractZstd(string $file, string $extractTo, ?int $availableBytes = null, ?string $archiveName = null): array {
+		return $this->cli->extractZstd($file, $extractTo, $availableBytes, $archiveName);
+	}
 }

@@ -101,8 +101,9 @@ jobs:
           # These binaries are not installed by the stock Nextcloud image.
           docker exec -u root extract-playwright-nextcloud sh -ec '
             apt-get update -qq
-            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq p7zip-full unrar-free >/dev/null
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq p7zip-full unrar-free zstd >/dev/null
             command -v 7za
+            command -v zstd
             command -v unrar
           '
           # The first-run wizard overlays the Files action menu on fresh NC
