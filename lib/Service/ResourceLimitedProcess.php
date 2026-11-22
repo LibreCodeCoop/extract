@@ -91,9 +91,9 @@ final class ResourceLimitedProcess {
 		} catch (\Throwable) {
 			$reason = 'inspection';
 		} finally {
-			if ($reason !== null) {
-				self::stopProcess($process, $groupId, $isolated);
-			}
+			// Clean up any descendants in the isolated session even when the
+			// direct decoder process has already exited successfully.
+			self::stopProcess($process, $groupId, $isolated);
 			fclose($pipes[1]);
 			fclose($pipes[2]);
 			$closedCode = proc_close($process);
@@ -190,7 +190,11 @@ final class ResourceLimitedProcess {
 					$groupId = self::processGroupId($status);
 				}
 				if (!$status['running']) {
-					$exitCode = $status['exitcode'];
+					// proc_get_status may return -1 on repeated queries; preserve
+					// the first valid exit code until the pipes reach EOF.
+					if ($exitCode === null || $exitCode < 0) {
+						$exitCode = $status['exitcode'];
+					}
 					if (feof($pipes[1]) && feof($pipes[2])) {
 						break;
 					}
@@ -200,9 +204,9 @@ final class ResourceLimitedProcess {
 		} catch (\Throwable) {
 			$reason = 'inspection';
 		} finally {
-			if ($reason !== null) {
-				self::stopProcess($process, $groupId, $isolated);
-			}
+			// Clean up any descendants in the isolated session even when the
+			// direct decoder process has already exited successfully.
+			self::stopProcess($process, $groupId, $isolated);
 			fclose($pipes[1]);
 			fclose($pipes[2]);
 			$closedCode = proc_close($process);
