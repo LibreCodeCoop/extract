@@ -15,7 +15,8 @@ namespace OCA\Extract\Service;
  * staging filesystem when they need a strict, kernel-enforced disk quota.
  */
 final class ResourceLimitedProcess {
-	private const POLL_INTERVAL_US = 100000;
+	private const POLL_INTERVAL_US = 50000;
+	private const MAX_DRAIN_PER_POLL = 524288;
 
 	/**
 	 * @param non-empty-list<string> $command Fixed executable and argument vector, never a shell command
@@ -47,9 +48,24 @@ final class ResourceLimitedProcess {
 		$deadline = microtime(true) + $timeoutSeconds;
 		try {
 			while (true) {
-				// Drain bounded chunks so verbose decoders cannot block on full pipes.
+				// Drain sufficient output to keep verbose decoders running,
+				// without starving deadline and staging-space inspections.
+				$remaining = self::MAX_DRAIN_PER_POLL;
 				foreach ([1, 2] as $index) {
-					fread($pipes[$index], 8192);
+					while ($remaining > 0) {
+						$chunk = fread($pipes[$index], min(65536, $remaining));
+						if ($chunk === false) {
+							$reason = 'io';
+							break 2;
+						}
+						if ($chunk === '') {
+							break;
+						}
+						$remaining -= strlen($chunk);
+					}
+				}
+				if ($reason !== null) {
+					break;
 				}
 				$reason = self::inspect($directory, $maxBytes, $maxEntries);
 				if ($reason !== null) {
@@ -98,6 +114,102 @@ final class ResourceLimitedProcess {
 			return ['success' => false, 'reason' => 'exit'];
 		}
 		return ['success' => true, 'reason' => ''];
+	}
+
+	/**
+	 * Inspect archive listing output with bounded memory and execution time.
+	 * Never run listing commands through exec(), which buffers all output
+	 * without imposing a timeout or a memory limit.
+	 *
+	 * @param non-empty-list<string> $command
+	 * @return array{success: bool, reason: string, output: string}
+	 */
+	public static function capture(array $command, int $maxOutputBytes, int $timeoutSeconds): array {
+		if ($maxOutputBytes < 1 || $timeoutSeconds < 1 || !function_exists('proc_open')) {
+			return ['success' => false, 'reason' => 'unavailable', 'output' => ''];
+		}
+		try {
+			$process = proc_open($command, [
+				0 => ['pipe', 'r'],
+				1 => ['pipe', 'w'],
+				2 => ['pipe', 'w'],
+			], $pipes, null, null, ['bypass_shell' => true]);
+		} catch (\Throwable) {
+			return ['success' => false, 'reason' => 'unavailable', 'output' => ''];
+		}
+		if (!is_resource($process)) {
+			return ['success' => false, 'reason' => 'unavailable', 'output' => ''];
+		}
+
+		fclose($pipes[0]);
+		stream_set_blocking($pipes[1], false);
+		stream_set_blocking($pipes[2], false);
+		$output = '';
+		$capturedBytes = 0;
+		$reason = null;
+		$exitCode = null;
+		$deadline = hrtime(true) + (int)min($timeoutSeconds, 3600) * 1000000000;
+		try {
+			while (true) {
+				$remaining = self::MAX_DRAIN_PER_POLL;
+				foreach ([1, 2] as $index) {
+					while ($remaining > 0) {
+						$chunk = fread($pipes[$index], min(65536, $remaining));
+						if ($chunk === false) {
+							$reason = 'io';
+							break 2;
+						}
+						if ($chunk === '') {
+							break;
+						}
+						if (strlen($chunk) > $maxOutputBytes - $capturedBytes) {
+							$reason = 'output';
+							break 2;
+						}
+						$capturedBytes += strlen($chunk);
+						$remaining -= strlen($chunk);
+						if ($index === 1) {
+							$output .= $chunk;
+						}
+					}
+				}
+				if ($reason !== null) {
+					break;
+				}
+				if (hrtime(true) >= $deadline) {
+					$reason = 'timeout';
+					break;
+				}
+				$status = proc_get_status($process);
+				if (!$status['running']) {
+					$exitCode = $status['exitcode'];
+					if (feof($pipes[1]) && feof($pipes[2])) {
+						break;
+					}
+				}
+				usleep(self::POLL_INTERVAL_US);
+			}
+		} catch (\Throwable) {
+			$reason = 'inspection';
+		} finally {
+			if ($reason !== null) {
+				proc_terminate($process);
+				usleep(self::POLL_INTERVAL_US);
+				if (proc_get_status($process)['running']) {
+					proc_terminate($process, 9);
+				}
+			}
+			fclose($pipes[1]);
+			fclose($pipes[2]);
+			$closedCode = proc_close($process);
+			if (($exitCode === null || $exitCode < 0) && $closedCode >= 0) {
+				$exitCode = $closedCode;
+			}
+		}
+		if ($reason === null && $exitCode !== 0) {
+			$reason = 'exit';
+		}
+		return ['success' => $reason === null, 'reason' => $reason ?? '', 'output' => $output];
 	}
 
 	private static function inspect(string $directory, int $maxBytes, int $maxEntries): ?string {

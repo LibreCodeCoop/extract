@@ -78,6 +78,48 @@ final class ResourceLimitedProcessTest extends TestCase {
 		self::assertSame(['success' => false, 'reason' => 'symlink'], $result);
 	}
 
+
+	public function testLargeStdoutDoesNotBlockAValidDecoder(): void {
+		$result = ResourceLimitedProcess::run(
+			[PHP_BINARY, '-r', 'echo str_repeat("x", 1000000);'],
+			$this->directory,
+			100,
+			10,
+			3,
+		);
+		self::assertSame(['success' => true, 'reason' => ''], $result);
+	}
+
+	public function testListingRejectsExcessOutput(): void {
+		$result = ResourceLimitedProcess::capture(
+			[PHP_BINARY, '-r', 'echo str_repeat("x", 1000000);'],
+			1024,
+			3,
+		);
+		self::assertFalse($result['success']);
+		self::assertSame('output', $result['reason']);
+		self::assertLessThanOrEqual(1024, strlen($result['output']));
+	}
+
+	public function testListingHasDeadline(): void {
+		$result = ResourceLimitedProcess::capture(
+			[PHP_BINARY, '-r', 'sleep(10);'],
+			1024,
+			1,
+		);
+		self::assertFalse($result['success']);
+		self::assertSame('timeout', $result['reason']);
+	}
+
+	public function testListingAcceptsNormalOutput(): void {
+		$result = ResourceLimitedProcess::capture(
+			[PHP_BINARY, '-r', 'echo "Path = normal.txt\nSize = 5\n";'],
+			1024,
+			3,
+		);
+		self::assertSame(['success' => true, 'reason' => '', 'output' => "Path = normal.txt\nSize = 5\n"], $result);
+	}
+
 	public function testDoesNotAcceptNonZeroExit(): void {
 		$result = ResourceLimitedProcess::run([
 			PHP_BINARY, '-r', 'exit(9);',
