@@ -120,6 +120,59 @@ final class ResourceLimitedProcessTest extends TestCase {
 		self::assertSame(['success' => true, 'reason' => '', 'output' => "Path = normal.txt\nSize = 5\n"], $result);
 	}
 
+
+	public function testTimeoutStopsChildProcessInIsolatedSession(): void {
+		if (!function_exists('posix_kill') || !is_executable('/usr/bin/setsid')) {
+			$result = ResourceLimitedProcess::run(
+				[PHP_BINARY, '-r', 'sleep(5);'],
+				$this->directory,
+				128,
+				5,
+				1,
+			);
+			self::assertSame('timeout', $result['reason']);
+			return;
+		}
+
+		$marker = $this->directory . '/child-survived.txt';
+		$pidFile = $this->directory . '/child.pid';
+		$script = <<<'PHP'
+$child = proc_open(
+	[PHP_BINARY, '-r', 'usleep(1800000); file_put_contents($argv[1], "survived");', $argv[1]],
+	[
+		0 => ['file', '/dev/null', 'r'],
+		1 => ['file', '/dev/null', 'w'],
+		2 => ['file', '/dev/null', 'w'],
+	],
+	$pipes,
+);
+if (is_resource($child)) {
+	file_put_contents($argv[2], (string)proc_get_status($child)['pid']);
+}
+sleep(5);
+PHP;
+		try {
+			$result = ResourceLimitedProcess::run(
+				[PHP_BINARY, '-r', $script, $marker, $pidFile],
+				$this->directory,
+				128,
+				5,
+				1,
+			);
+			self::assertSame('timeout', $result['reason']);
+			self::assertFileExists($pidFile);
+			usleep(1100000);
+			self::assertFileDoesNotExist($marker, 'Timed-out decoder descendants must not continue writing');
+		} finally {
+			if (is_file($pidFile)) {
+				$pid = (int)file_get_contents($pidFile);
+				if ($pid > 1) {
+					@posix_kill($pid, 9);
+				}
+			}
+		}
+	}
+
 	public function testDoesNotAcceptNonZeroExit(): void {
 		$result = ResourceLimitedProcess::run([
 			PHP_BINARY, '-r', 'exit(9);',

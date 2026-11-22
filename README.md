@@ -69,8 +69,11 @@ enforces a default **300-second** timeout. Administrators can change it with
 `occ config:app:set extract max_extraction_seconds --value=600`.
 Checks are periodic and can be exceeded briefly; this is **not** a strict
 filesystem quota. High-risk deployments should isolate temporary storage
-with an operating-system-enforced limit. PHP `rar` extension extraction is
-not yet covered by the subprocess supervisor.
+with an operating-system-enforced limit. When available, the supervisor
+runs command-line decoders in their own POSIX session and terminates remaining
+child processes on completion or failure. The PHP `rar` extension follows a
+separate bounded streaming path with CRC checks rather than spawning a decoder,
+but it still cannot provide an operating-system-enforced CPU or disk quota.
 
 The `zip` PHP extension is required for Zip files. Rar needs either the PHP
 `rar` extension or the `unrar` binary; every other format is handled by the
