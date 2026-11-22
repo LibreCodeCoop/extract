@@ -23,6 +23,8 @@ final class Capabilities implements IPublicCapability {
 		'extract-tar-gz',
 		'extract-tar-bz2',
 		'extract-tar-xz',
+		'extract-zstd',
+		'extract-tar-zstd',
 		'extract-7z',
 	];
 

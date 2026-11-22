@@ -96,6 +96,16 @@ jobs:
             maintenance:install --database sqlite --database-name nextcloud \
             --admin-user e2e --admin-pass "$NEXTCLOUD_ADMIN_PASSWORD"
           docker exec -u www-data extract-playwright-nextcloud php /var/www/html/occ app:enable extract
+          docker exec -u www-data extract-playwright-nextcloud php /var/www/html/occ app:enable files_sharing
+          # Exercise the non-ZIP extractors in the disposable Nextcloud itself.
+          # These binaries are not installed by the stock Nextcloud image.
+          docker exec -u root extract-playwright-nextcloud sh -ec '
+            apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq p7zip-full unrar-free zstd >/dev/null
+            command -v 7za
+            command -v zstd
+            command -v unrar
+          '
           # The first-run wizard overlays the Files action menu on fresh NC
           # installations; disable it only within this disposable test instance.
           docker exec -u www-data extract-playwright-nextcloud php /var/www/html/occ app:disable firstrunwizard

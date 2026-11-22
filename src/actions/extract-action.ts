@@ -8,7 +8,7 @@ import type { ActionContext, ActionContextSingle, IFileAction, IFolder, INode } 
 import ArchiveArrowUpSvg from '@mdi/svg/svg/archive-arrow-up.svg?raw'
 import axios from '@nextcloud/axios'
 import { emit } from '@nextcloud/event-bus'
-import { Folder, Permission, registerFileAction } from '@nextcloud/files'
+import { FileType, Folder, Permission, registerFileAction } from '@nextcloud/files'
 import { translate as t } from '@nextcloud/l10n'
 import { generateOcsUrl } from '@nextcloud/router'
 import { createApp } from 'vue'
@@ -32,6 +32,11 @@ export const SUPPORTED_ARCHIVE_MIME_TYPES = [
 	'application/x-bzip2',
 	'application/x-deb',
 	'application/x-compressed',
+	'application/x-xz',
+	'application/x-xz-compressed-tar',
+	'application/zstd',
+	'application/x-zstd',
+	'application/x-zstd-compressed-tar',
 ]
 
 interface ExtractedFolder {
@@ -75,7 +80,22 @@ function archiveMimeOf(node: INode): string | undefined {
 	if (mime !== '' && mime !== 'application/octet-stream') {
 		return mime
 	}
-	return node.attributes?.getcontenttype as string | undefined
+	const davMime = node.attributes?.getcontenttype as string | undefined
+	if (davMime && davMime !== 'application/octet-stream') {
+		return davMime
+	}
+
+	// Nextcloud 33–35 may classify XZ archives as octet-stream, leaving the
+	// Files action hidden despite a working server decoder. Infer only these
+	// known extensions when both reported MIME values are unspecified.
+	const fileName = node.basename.toLowerCase()
+	if (fileName.endsWith('.tar.xz') || fileName.endsWith('.txz') || fileName.endsWith('.xz')) {
+		return 'application/x-xz'
+	}
+	if (fileName.endsWith('.zst') || fileName.endsWith('.zstd') || fileName.endsWith('.tzst')) {
+		return 'application/zstd'
+	}
+	return undefined
 }
 
 /**
@@ -200,6 +220,7 @@ function isEnabled(context: ActionContext): boolean {
 
 	const [node] = context.nodes
 	return node !== undefined
+		&& node.type === FileType.File
 		&& isSupportedArchive(node)
 		&& (node.permissions & Permission.READ) !== 0
 		&& (context.folder.permissions & Permission.CREATE) !== 0
