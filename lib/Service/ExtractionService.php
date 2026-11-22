@@ -262,23 +262,56 @@ final class ExtractionService {
 	 *
 	 * @psalm-return array{code: 0|1, desc?: string}
 	 */
-	public function extractRar(string $file, string $extractTo): array {
+	/**
+	 * Run a command-line decoder with periodic staging checks and a time limit.
+	 * This is best-effort supervision, not a kernel-enforced filesystem quota.
+	 *
+	 * @param non-empty-list<string> $command
+	 * @return array{code: 0|1, desc?: string}
+	 */
+	private function runExternalDecoder(array $command, string $extractTo, ?int $availableBytes = null): array {
+		$limit = $this->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
+		if ($availableBytes !== null && $availableBytes >= 0) {
+			$limit = min($limit, $availableBytes);
+		}
+		$stagingSpace = disk_free_space(dirname($extractTo));
+		if ($stagingSpace !== false) {
+			$limit = min($limit, (int)$stagingSpace);
+		}
+		$result = ResourceLimitedProcess::run(
+			$command,
+			$extractTo,
+			$limit,
+			$this->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES),
+			$this->configuredLimit('max_extraction_seconds', 300),
+		);
+		if (!$result['success']) {
+			$this->logger->warning('Archive decoder stopped: ' . $result['reason']);
+			$message = match ($result['reason']) {
+				'size' => 'Archive exceeds the allowed extraction size',
+				'entries' => 'Archive contains too many files',
+				'timeout' => 'Archive extraction timed out',
+				'symlink' => 'Symbolic links are not supported in extracted archives',
+				default => 'Could not extract archive',
+			};
+			return ['code' => 0, 'desc' => $this->l->t($message)];
+		}
+		return ['code' => 1];
+	}
+
+	public function extractRar(string $file, string $extractTo, ?int $availableBytes = null): array {
 		$response = [];
 
 		if (!extension_loaded('rar')) {
 			if (!$this->isCommandAvailable('unrar')) {
-				return $this->extractRarWithSevenZip($file, $extractTo);
+				return $this->extractRarWithSevenZip($file, $extractTo, $availableBytes);
 			}
 			if ($error = $this->assertSafeRarShell($file)) {
 				return $error;
 			}
-			$output = [];
-			$return = 0;
-			exec('unrar x ' . escapeshellarg($file) . ' -R ' . escapeshellarg($extractTo) . '/ -o+', $output, $return);
-			if ($return !== 0) {
-				$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Oops something went wrong. Check that you have rar extension or unrar installed')]);
-				$this->logger->error('unrar failed with exit code ' . $return . '. Output: ' . print_r($output, true));
-				return $response;
+			$result = $this->runExternalDecoder(['unrar', 'x', $file, '-R', $extractTo . '/', '-o+'], $extractTo, $availableBytes);
+			if ($result['code'] !== 1) {
+				return $result;
 			}
 		} else {
 			$rar_file = rar_open($file);
@@ -322,7 +355,6 @@ final class ExtractionService {
 	 * @psalm-return array{code: 0|1, desc?: string}
 	 */
 	public function extractOther(string $file, string $extractTo, ?int $availableBytes = null): array {
-		$response = [];
 
 		$temporarySpace = disk_free_space(dirname($extractTo));
 		if ($error = $this->assertSafe7z(
@@ -332,21 +364,7 @@ final class ExtractionService {
 		)) {
 			return $error;
 		}
-		$output = [];
-		$return = 0;
-		exec('7za -y x ' . escapeshellarg($file) . ' -o' . escapeshellarg($extractTo), $output, $return);
-
-		// 7za reports failure through its exit code: 0 on success, 2 on a fatal
-		// error such as a corrupt archive or a missing file, 127 when the
-		// binary itself is absent. The output line count is not a usable signal
-		// because failures print more lines than successes.
-		if ($return !== 0) {
-			$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);
-			$this->logger->error('7za failed with exit code ' . $return . '. Is 7-Zip installed? Output: ' . print_r($output, true));
-			return $response;
-		}
-		$response = array_merge($response, ['code' => 1]);
-		return $response;
+		return $this->runExternalDecoder(['7za', '-y', 'x', $file, '-o' . $extractTo], $extractTo, $availableBytes);
 	}
 
 	/**
@@ -378,21 +396,14 @@ final class ExtractionService {
 	 * Use the full 7z binary as an alternate RAR decoder on distributions that
 	 * cannot install the unrar command or the PHP rar extension.
 	 */
-	private function extractRarWithSevenZip(string $file, string $extractTo): array {
+	private function extractRarWithSevenZip(string $file, string $extractTo, ?int $availableBytes = null): array {
 		if (!$this->isCommandAvailable('7z')) {
 			return ['code' => 0, 'desc' => $this->l->t('RAR extraction requires unrar, the PHP rar extension, or the full 7z binary')];
 		}
 		if ($error = $this->assertSafeRarSevenZip($file)) {
 			return $error;
 		}
-		$output = [];
-		$return = 0;
-		exec('7z -y x ' . escapeshellarg($file) . ' -o' . escapeshellarg($extractTo) . ' 2>&1', $output, $return);
-		if ($return !== 0) {
-			$this->logger->error('RAR extraction via 7z failed (rc=' . $return . '): ' . implode("\n", $output));
-			return ['code' => 0, 'desc' => $this->l->t('Could not extract RAR archive')];
-		}
-		return ['code' => 1];
+		return $this->runExternalDecoder(['7z', '-y', 'x', $file, '-o' . $extractTo], $extractTo, $availableBytes);
 	}
 
 	/**

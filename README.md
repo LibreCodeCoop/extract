@@ -60,8 +60,15 @@ The same configured limits and destination-space estimates are now checked
 against the *declared* contents of archives handled by `7za` (7z, tar,
 Gzip, Bzip2 and Deb) **before** launching their extraction. Unlike the ZIP
 streaming path, an external decoder may expand beyond dishonest archive
-metadata before the app can stop it; this is a preflight safeguard and not
-a process-level disk quota. RAR decoding still needs separate resource bounds.
+metadata before the app can stop it. Command-line decoders now run under a
+best-effort supervisor that periodically measures the staging directory,
+interrupts processes that exceed the configured size or entry budget, and
+enforces a default **300-second** timeout. Administrators can change it with
+`occ config:app:set extract max_extraction_seconds --value=600`.
+Checks are periodic and can be exceeded briefly; this is **not** a strict
+filesystem quota. High-risk deployments should isolate temporary storage
+with an operating-system-enforced limit. PHP `rar` extension extraction is
+not yet covered by the subprocess supervisor.
 
 The `zip` PHP extension is required for Zip files. Rar needs either the PHP
 `rar` extension or the `unrar` binary; every other format is handled by the

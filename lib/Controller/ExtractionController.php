@@ -534,7 +534,7 @@ final class ExtractionController extends AEnvironmentAwareController {
 				$response = $this->extractionService->extractZip($file, $extractTo, $destinationParent->getFreeSpace());
 				break;
 			case 'rar':
-				$response = $this->extractionService->extractRar($file, $extractTo);
+				$response = $this->extractionService->extractRar($file, $extractTo, $destinationParent->getFreeSpace());
 				break;
 			default:
 				if (self::isWrappedTarball($nameOfFile) === true) {
