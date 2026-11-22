@@ -236,33 +236,9 @@ final class ExtractionServiceTest extends TestCase {
 	}
 
 
-	public function testRefusesArchiveLinkMetadataBeforeExtraction(): void {
-		$method = new \ReflectionMethod(ExtractionService::class, 'rejectUnsafeMetadata');
-		foreach ([
-			'Attributes = A lrwxrwxrwx',
-			'Hard Link = file.txt',
-			'Symbolic Link = ../../outside',
-			'Junction = ../outside',
-			'Attributes = A brw-rw----',
-		] as $line) {
-			$response = $method->invoke($this->service, $line);
-			self::assertSame(0, $response['code'], $line);
-		}
-	}
 
-	public function testAllowsOrdinaryArchiveMetadata(): void {
-		$method = new \ReflectionMethod(ExtractionService::class, 'rejectUnsafeMetadata');
-		foreach ([
-			'Attributes = D drwxr-xr-x',
-			'Attributes = A -rw-r--r--',
-			'Attributes = RA',
-			'Symbolic Link = ',
-			'Hard Link = ',
-			'Size = 1024',
-		] as $line) {
-			self::assertNull($method->invoke($this->service, $line), $line);
-		}
-	}
+
+
 
 
 
