@@ -205,7 +205,7 @@ final class ExtractionControllerTest extends TestCase {
 		// A real service instance. The archive path does not exist, so extractZip()
 		// reports "Cannot open Zip file" — reaching it proves the non-local storage
 		// no longer refuses the request.
-		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class));
+		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class), $this->createStub(\OCP\IConfig::class));
 
 		$controller = new ExtractionController(
 			'extract',
@@ -271,7 +271,7 @@ final class ExtractionControllerTest extends TestCase {
 		// A real service instance. The archive path does not exist, so
 		// extractZip() reports "Cannot open Zip file" — reaching it proves the
 		// local-storage path let the request through.
-		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class));
+		$service = new ExtractionService($l10n, $this->createStub(LoggerInterface::class), $this->createStub(\OCP\IConfig::class));
 
 		$controller = new ExtractionController(
 			'extract',
@@ -317,7 +317,7 @@ final class ExtractionControllerTest extends TestCase {
 		$controller = new ExtractionController(
 			'extract',
 			$this->createStub(IRequest::class),
-			new ExtractionService($l10n, $this->createStub(LoggerInterface::class)),
+			new ExtractionService($l10n, $this->createStub(LoggerInterface::class), $this->createStub(\OCP\IConfig::class)),
 			$rootFolder,
 			$l10n,
 			$this->createStub(LoggerInterface::class),
@@ -464,12 +464,10 @@ final class ExtractionControllerTest extends TestCase {
 	}
 
 	/**
-	 * Forbidden file names are removed before the tree is published.
-	 *
-	 * The walk must skip the `.` and `..` entries: the filename validator rejects
-	 * them, and the removal then fails because unlink() cannot remove a directory.
+	 * Invalid names cause a failure before publication; valid extracted data
+	 * must not be discarded to make an incomplete extraction appear successful.
 	 */
-	public function testRemoveForbiddenFilesSkipsDotEntries(): void {
+	public function testInvalidNamesAreRejectedWithoutSilentlyDroppingFiles(): void {
 		$source = sys_get_temp_dir() . '/extract-forbidden-' . bin2hex(random_bytes(6));
 		mkdir($source . '/sub', 0700, true);
 		file_put_contents($source . '/keep.txt', 'keep');
@@ -478,25 +476,48 @@ final class ExtractionControllerTest extends TestCase {
 
 		$validator = $this->createStub(IFilenameValidator::class);
 		$validator->method('isFilenameValid')->willReturnCallback(
-			// The real validator rejects `.` and `..` as dot directories, so the
-			// stub must too, otherwise it would hide a walk that visits them.
 			static fn (string $name): bool => $name !== '.htaccess' && $name !== '.' && $name !== '..',
 		);
 
-		$reflection = new \ReflectionClass(ExtractionController::class);
-		$controller = $reflection->newInstanceWithoutConstructor();
+		$controller = (new \ReflectionClass(ExtractionController::class))->newInstanceWithoutConstructor();
 		$this->setProperty($controller, 'filenameValidator', $validator);
-		$this->setProperty($controller, 'logger', $this->createStub(LoggerInterface::class));
-
-		$method = new \ReflectionMethod(ExtractionController::class, 'removeForbiddenFiles');
+		$check = new \ReflectionMethod(ExtractionController::class, 'assertValidExtractedNames');
 
 		try {
-			$method->invoke($controller, $source);
-
+			try {
+				$check->invoke($controller, $source);
+				self::fail('Invalid extracted names must abort the operation');
+			} catch (NotPermittedException $e) {
+				self::assertSame('Archive contains filenames that Nextcloud cannot store', $e->getMessage());
+			}
 			self::assertFileExists($source . '/keep.txt');
-			self::assertFileDoesNotExist($source . '/.htaccess');
-			self::assertFileDoesNotExist($source . '/sub/.htaccess');
-			self::assertDirectoryExists($source . '/sub');
+			self::assertFileExists($source . '/.htaccess');
+			self::assertFileExists($source . '/sub/.htaccess');
+		} finally {
+			$this->removeDirectory($source);
+		}
+	}
+
+	/**
+	 * Valid names in accented, Korean and Chinese scripts must not be rejected.
+	 */
+	public function testValidUnicodeNamesArePreserved(): void {
+		$source = sys_get_temp_dir() . '/extract-unicode-' . bin2hex(random_bytes(6));
+		mkdir($source . '/한국어', 0700, true);
+		file_put_contents($source . '/Café.txt', 'cafe');
+		file_put_contents($source . '/한국어/전자책.txt', 'book');
+		file_put_contents($source . '/中文.txt', 'chinese');
+
+		$validator = $this->createStub(IFilenameValidator::class);
+		$validator->method('isFilenameValid')->willReturn(true);
+		$controller = (new \ReflectionClass(ExtractionController::class))->newInstanceWithoutConstructor();
+		$this->setProperty($controller, 'filenameValidator', $validator);
+
+		try {
+			(new \ReflectionMethod(ExtractionController::class, 'assertValidExtractedNames'))->invoke($controller, $source);
+			self::assertFileExists($source . '/Café.txt');
+			self::assertFileExists($source . '/한국어/전자책.txt');
+			self::assertFileExists($source . '/中文.txt');
 		} finally {
 			$this->removeDirectory($source);
 		}
