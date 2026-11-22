@@ -1,4 +1,6 @@
 { "translations": {
-    "File not found" : "Không tìm thấy tập tin"
+    "File not found" : "Không tìm thấy tập tin",
+    "Folder name" : "Tên thư mục",
+    "Cancel" : "Cancel"
 },"pluralForm" :"nplurals=1; plural=0;"
 }
