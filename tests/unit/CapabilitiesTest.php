@@ -56,6 +56,8 @@ final class CapabilitiesTest extends TestCase {
 		self::assertContains('extract-zip', $capabilities['extract']['features']);
 		self::assertContains('extract-rar', $capabilities['extract']['features']);
 		self::assertContains('extract-7z', $capabilities['extract']['features']);
+		self::assertContains('extract-zstd', $capabilities['extract']['features']);
+		self::assertContains('extract-tar-zstd', $capabilities['extract']['features']);
 	}
 
 	/**
