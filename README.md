@@ -45,6 +45,8 @@ the archive directory.
 Extraction needs enough free space in the server's temporary directory for the
 uncompressed archive. Symbolic links in archives are not supported.
 
+External decoders require PHP `proc_open` to be enabled; if it is disabled,
+extraction fails closed rather than falling back to unsupervised `exec()`.
 ZIP extraction enforces the destination's available Nextcloud quota, staging
 disk free space, and two configurable safety limits (defaults: **2 GiB** total
 uncompressed bytes and **10,000** entries). The limits apply before extraction
