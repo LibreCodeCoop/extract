@@ -90,6 +90,17 @@ final class ResourceLimitedProcessTest extends TestCase {
 		self::assertSame(['success' => true, 'reason' => ''], $result);
 	}
 
+	public function testLargeStderrDoesNotBlockAValidDecoder(): void {
+		$result = ResourceLimitedProcess::run(
+			[PHP_BINARY, '-r', 'fwrite(STDERR, str_repeat("x", 1000000));'],
+			$this->directory,
+			100,
+			10,
+			3,
+		);
+		self::assertSame(['success' => true, 'reason' => ''], $result);
+	}
+
 	public function testListingRejectsExcessOutput(): void {
 		$result = ResourceLimitedProcess::capture(
 			[PHP_BINARY, '-r', 'echo str_repeat("x", 1000000);'],
