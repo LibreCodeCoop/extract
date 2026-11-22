@@ -265,6 +265,52 @@ final class ExtractionServiceTest extends TestCase {
 	}
 
 	/**
+	 * The PHP RAR extraction path must enforce limits on actual stream bytes
+	 * and check CRC, not trust only the archive's advertised size.
+	 */
+	public function testBoundedRarStreamPreservesDataAndRefusesInvalidCrc(): void {
+		$method = new \ReflectionMethod(ExtractionService::class, 'copyRarStream');
+		$payload = 'hello world';
+		$stream = fopen('php://temp', 'w+b');
+		self::assertIsResource($stream);
+		fwrite($stream, $payload);
+		rewind($stream);
+		$written = 0;
+		try {
+			$arguments = [$stream, $this->tmpDir . '/good.txt', strlen($payload), hash('crc32b', $payload), &$written, strlen($payload), hrtime(true) + 2000000000];
+			self::assertTrue($method->invokeArgs($this->service, $arguments));
+			self::assertSame($payload, file_get_contents($this->tmpDir . '/good.txt'));
+			self::assertSame(strlen($payload), $written);
+		} finally {
+			fclose($stream);
+		}
+
+		$stream = fopen('php://temp', 'w+b');
+		self::assertIsResource($stream);
+		fwrite($stream, $payload);
+		rewind($stream);
+		$written = 0;
+		try {
+			$arguments = [$stream, $this->tmpDir . '/limited.txt', strlen($payload), hash('crc32b', $payload), &$written, strlen($payload) - 1, hrtime(true) + 2000000000];
+			self::assertFalse($method->invokeArgs($this->service, $arguments));
+		} finally {
+			fclose($stream);
+		}
+
+		$stream = fopen('php://temp', 'w+b');
+		self::assertIsResource($stream);
+		fwrite($stream, $payload);
+		rewind($stream);
+		$written = 0;
+		try {
+			$arguments = [$stream, $this->tmpDir . '/corrupt.txt', strlen($payload), '00000000', &$written, strlen($payload), hrtime(true) + 2000000000];
+			self::assertFalse($method->invokeArgs($this->service, $arguments));
+		} finally {
+			fclose($stream);
+		}
+	}
+
+	/**
 	 * A decompression bomb must be refused before staging any files when the
 	 * total uncompressed content cannot fit the user's Nextcloud quota.
 	 */

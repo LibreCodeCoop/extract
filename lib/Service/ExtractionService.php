@@ -371,35 +371,7 @@ final class ExtractionService {
 				return $result;
 			}
 		} else {
-			$rar_file = rar_open($file);
-			if ($rar_file === false) {
-				$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Cannot open Rar file')]);
-				return $response;
-			}
-			$list = rar_list($rar_file);
-			if ($list === false) {
-				rar_close($rar_file);
-				return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
-			}
-			foreach ($list as $archive_file) {
-				if ($error = $this->rejectUnsafe($archive_file->getName())) {
-					rar_close($rar_file);
-					return $error;
-				}
-			}
-			foreach ($list as $archive_file) {
-				$entry = rar_entry_get($rar_file, $archive_file->getName());
-				if ($entry->extract($extractTo) === false) {
-					// A password-protected or damaged entry fails here; without this
-					// check the method reported success and the caller published a
-					// partial result.
-					rar_close($rar_file);
-					$response = array_merge($response, ['code' => 0, 'desc' => $this->l->t('Oops something went wrong.')]);
-					$this->logger->error('rar_entry::extract failed for ' . $archive_file->getName());
-					return $response;
-				}
-			}
-			rar_close($rar_file);
+			return $this->extractRarWithPhpExtension($file, $extractTo, $availableBytes);
 		}
 
 		$response = array_merge($response, ['code' => 1]);
@@ -411,6 +383,153 @@ final class ExtractionService {
 	 *
 	 * @psalm-return array{code: 0|1, desc?: string}
 	 */
+	/**
+	 * Stream a RAR entry into staging with strict per-entry and total-byte
+	 * limits. Unlike RarEntry::extract(), PHP controls every output path.
+	 *
+	 * @param resource $input
+	 */
+	private function copyRarStream($input, string $target, int $expectedBytes, string $expectedCrc, int &$written, int $budget, int $deadline): bool {
+		$output = fopen($target, 'xb');
+		if ($output === false) {
+			return false;
+		}
+		$size = 0;
+		$hash = hash_init('crc32b');
+		try {
+			while (!feof($input)) {
+				if (hrtime(true) >= $deadline) {
+					return false;
+				}
+				$chunk = fread($input, 65536);
+				if ($chunk === false || ($chunk === '' && !feof($input))) {
+					return false;
+				}
+				$length = strlen($chunk);
+				if ($length > $budget - $written || $length > $expectedBytes - $size) {
+					return false;
+				}
+				$offset = 0;
+				while ($offset < $length) {
+					if (hrtime(true) >= $deadline) {
+						return false;
+					}
+					$count = fwrite($output, substr($chunk, $offset));
+					if ($count === false || $count === 0) {
+						return false;
+					}
+					$offset += $count;
+				}
+				hash_update($hash, $chunk);
+				$size += $length;
+				$written += $length;
+			}
+		} finally {
+			fclose($output);
+		}
+		return $size === $expectedBytes && hash_equals(strtolower($expectedCrc), hash_final($hash));
+	}
+
+	/**
+	 * The PHP RAR extension must not bypass quota checks or create archive
+	 * links using RarEntry::extract(). Stream only regular files and folders
+	 * with a cumulative size budget and CRC verification.
+	 *
+	 * @return array{code: 0|1, desc?: string}
+	 */
+	private function extractRarWithPhpExtension(string $file, string $extractTo, ?int $availableBytes): array {
+		$archive = rar_open($file);
+		if ($archive === false) {
+			return ['code' => 0, 'desc' => $this->l->t('Cannot open Rar file')];
+		}
+		try {
+			$entries = rar_list($archive);
+			if ($entries === false) {
+				return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
+			}
+			if (count($entries) > $this->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES)) {
+				return ['code' => 0, 'desc' => $this->l->t('Archive contains too many files')];
+			}
+			$budget = $this->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
+			if ($availableBytes !== null && $availableBytes >= 0) {
+				$budget = min($budget, $availableBytes);
+			}
+			$space = disk_free_space(dirname($extractTo));
+			if ($space !== false) {
+				$budget = min($budget, (int)$space);
+			}
+			$declared = 0;
+			$paths = [];
+			foreach ($entries as $entry) {
+				$name = str_replace('\\', '/', $entry->getName());
+				$relative = rtrim($name, '/');
+				if ($relative === '' || preg_match('//u', $relative) !== 1 || isset($paths[$relative])) {
+					return ['code' => 0, 'desc' => $this->l->t('Archive contains an invalid filename')];
+				}
+				if ($error = $this->rejectUnsafe($name)) {
+					return $error;
+				}
+				$paths[$relative] = true;
+				if ($entry->isEncrypted()) {
+					return ['code' => 0, 'desc' => $this->l->t('Encrypted RAR archives are not supported')];
+				}
+				// Unix RAR4 entries can encode links and devices as native
+				// filesystem types. RAR5 redirects are never materialized:
+				// getStream() writes regular file bytes under PHP control.
+				if (defined('RAR_HOST_UNIX') && $entry->getHostOs() === constant('RAR_HOST_UNIX')) {
+					$type = $entry->getAttr() & 0xf000;
+					if ($type !== 0x8000 && $type !== 0x4000) {
+						return ['code' => 0, 'desc' => $this->l->t('Archive contains links or unsupported special files')];
+					}
+				}
+				$size = $entry->getUnpackedSize();
+				if ($size === false || $size < 0 || $size > $budget - $declared) {
+					return ['code' => 0, 'desc' => $this->l->t('Archive exceeds the allowed extraction size')];
+				}
+				$declared += $size;
+			}
+			if (!is_dir($extractTo) && !mkdir($extractTo, 0700, true)) {
+				return ['code' => 0, 'desc' => $this->l->t('Could not prepare extraction directory')];
+			}
+			$written = 0;
+			$deadline = hrtime(true) + min($this->configuredLimit('max_extraction_seconds', 300), 3600) * 1000000000;
+			foreach ($entries as $entry) {
+				$name = rtrim(str_replace('\\', '/', $entry->getName()), '/');
+				$target = $extractTo . '/' . $name;
+				if ($entry->isDirectory()) {
+					if (!is_dir($target) && !mkdir($target, 0700, true)) {
+						return ['code' => 0, 'desc' => $this->l->t('Could not extract RAR archive')];
+					}
+					continue;
+				}
+				if (!is_dir(dirname($target)) && !mkdir(dirname($target), 0700, true)) {
+					return ['code' => 0, 'desc' => $this->l->t('Could not extract RAR archive')];
+				}
+				$crc = $entry->getCrc();
+				if (!is_string($crc) || preg_match('/^[0-9a-fA-F]{8}$/', $crc) !== 1) {
+					return ['code' => 0, 'desc' => $this->l->t('Could not verify RAR entry integrity')];
+				}
+				$input = $entry->getStream();
+				if ($input === false) {
+					return ['code' => 0, 'desc' => $this->l->t('Could not read RAR entry')];
+				}
+				try {
+					if (!$this->copyRarStream($input, $target, $entry->getUnpackedSize(), $crc, $written, $budget, $deadline)) {
+						return ['code' => 0, 'desc' => $this->l->t('RAR extraction exceeded limits or failed integrity verification')];
+					}
+				} finally {
+					fclose($input);
+				}
+			}
+			return ['code' => 1];
+		} catch (\Throwable $e) {
+			$this->logger->warning('RAR stream extraction failed: ' . $e->getMessage());
+			return ['code' => 0, 'desc' => $this->l->t('Could not extract RAR archive')];
+		} finally {
+			rar_close($archive);
+		}
+	}
+
 	public function extractOther(string $file, string $extractTo, ?int $availableBytes = null): array {
 
 		$temporarySpace = disk_free_space(dirname($extractTo));
