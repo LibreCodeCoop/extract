@@ -43,6 +43,9 @@ final class ExtractionControllerTest extends TestCase {
 			'application/x-bzip2', // .bz2 and .tbz2
 			'application/x-7z-compressed', // .7z
 			'application/x-deb', // .deb
+			'application/x-xz', // .xz and .tar.xz on some servers
+			'application/x-xz-compressed-tar', // .tar.xz
+			'application/zstd', // .zst and .tar.zst
 		];
 
 		foreach ($nextcloudArchiveMimeTypes as $mime) {
@@ -69,6 +72,8 @@ final class ExtractionControllerTest extends TestCase {
 	public function testZipAndRarUseTheirDedicatedStrategies(): void {
 		self::assertSame('zip', ExtractionController::SUPPORTED_MIME_TYPES['application/zip']);
 		self::assertSame('rar', ExtractionController::SUPPORTED_MIME_TYPES['application/x-rar-compressed']);
+		self::assertSame('other', ExtractionController::SUPPORTED_MIME_TYPES['application/x-xz-compressed-tar']);
+		self::assertSame('zstd', ExtractionController::SUPPORTED_MIME_TYPES['application/zstd']);
 	}
 
 	/**
@@ -76,7 +81,7 @@ final class ExtractionControllerTest extends TestCase {
 	 */
 	public function testEveryStrategyIsKnown(): void {
 		foreach (ExtractionController::SUPPORTED_MIME_TYPES as $mime => $strategy) {
-			self::assertContains($strategy, ['zip', 'rar', 'other'], "$mime maps to unknown strategy $strategy");
+			self::assertContains($strategy, ['zip', 'rar', 'other', 'zstd'], "$mime maps to unknown strategy $strategy");
 		}
 	}
 
@@ -94,6 +99,9 @@ final class ExtractionControllerTest extends TestCase {
 			'archive.tar.gz',
 			'archive.tar.bz2',
 			'archive.tar.xz',
+			'archive.tar.zst',
+			'archive.tar.zstd',
+			'archive.tzst',
 			'archive.tgz',
 			'archive.tbz',
 			'archive.tbz2',
@@ -111,7 +119,7 @@ final class ExtractionControllerTest extends TestCase {
 	public function testPlainArchivesAreNotWrappedTarballs(): void {
 		$method = new \ReflectionMethod(ExtractionController::class, 'isWrappedTarball');
 
-		$plain = ['archive.tar', 'archive.zip', 'archive.7z', 'archive.rar', 'archive.deb', 'archive.gz'];
+		$plain = ['archive.tar', 'archive.zip', 'archive.7z', 'archive.rar', 'archive.deb', 'archive.gz', 'archive.zst'];
 		foreach ($plain as $name) {
 			self::assertFalse($method->invoke(null, $name), "$name should take the single-pass path");
 		}
@@ -128,6 +136,11 @@ final class ExtractionControllerTest extends TestCase {
 			'archive.tar.gz' => 'archive',
 			'archive.tgz' => 'archive',
 			'archive.tar.bz2' => 'archive',
+			'archive.tar.xz' => 'archive',
+			'archive.tar.zst' => 'archive',
+			'archive.tar.zstd' => 'archive',
+			'archive.tzst' => 'archive',
+			'archive.zst' => 'archive',
 			'archive.tbz2' => 'archive',
 			'archive.tar' => 'archive',
 			'my.data.tar.gz' => 'my.data',
@@ -148,7 +161,7 @@ final class ExtractionControllerTest extends TestCase {
 		$name = new \ReflectionMethod(ExtractionController::class, 'resultFolderName');
 		$usable = new \ReflectionMethod(ExtractionController::class, 'isUsableFolderName');
 
-		foreach (['.tar.gz', '.tar', '.tbz2', '.gz', '..tar.gz', '...tar.gz', '..', '.'] as $fileName) {
+		foreach (['.tar.gz', '.tar.zst', '.tar', '.tbz2', '.gz', '..tar.gz', '...tar.gz', '..', '.'] as $fileName) {
 			self::assertFalse(
 				$usable->invoke(null, $name->invoke(null, $fileName)),
 				"$fileName must not be accepted as a result folder",

@@ -294,6 +294,97 @@ test('OCS extracts a real 7z archive on Nextcloud', async ({ request }) => {
 })
 
 /**
+ * Exercise the MIME-to-decoder contract with real XZ/Zstandard archives.
+ * The original archive and destination are always disposable CI fixtures.
+ */
+for (const entry of [
+	{ fixtureName: 'valid.tar.xz', extension: '.tar.xz', mime: 'application/x-xz', resultName: 'hello.txt' },
+	{ fixtureName: 'valid.zst', extension: '.zst', mime: 'application/zstd', resultName: '' },
+	{ fixtureName: 'valid.tar.zst', extension: '.tar.zst', mime: 'application/zstd', resultName: 'hello.txt' },
+]) {
+	test(`OCS extracts ${entry.extension} with supervised decoder`, async ({ request }) => {
+		const stem = 'extract-format-' + randomUUID().slice(0, 8)
+		const file = stem + entry.extension
+		const destination = stem + '-out'
+		const archive = await readFile(new URL('../../Fixtures/' + entry.fixtureName, import.meta.url))
+		try {
+			const uploaded = await request.put(dav(file), {
+				headers: { Authorization: authorization, 'Content-Type': entry.mime },
+				data: archive,
+			})
+			expect(uploaded.status()).toBe(201)
+			const response = await request.post(extractEndpoint, {
+				headers: apiHeaders,
+				data: {
+					nameOfFile: file,
+					directory: '/',
+					external: false,
+					mime: entry.mime,
+					targetDirName: destination,
+				},
+			})
+			expect(response.ok()).toBeTruthy()
+			const result = await response.json()
+			expect(result.ocs.data.code).toBe(1)
+			const extracted = await request.get(dav(destination + '/' + (entry.resultName || stem)), {
+				headers: { Authorization: authorization },
+			})
+			expect(extracted.status()).toBe(200)
+			expect(await extracted.text()).toBe('hello world\n')
+		} finally {
+			await deleteFile(request, file)
+			await deleteFile(request, destination)
+		}
+	})
+}
+
+/**
+ * Regression for XZ/Zstandard action visibility. A passing OCS request alone
+ * does not prove the Files menu recognises the MIME returned by Nextcloud.
+ */
+test('Files displays the Extract action for XZ and Zstandard archives', async ({ request, page }) => {
+	const dir = 'extract-formats-menu-' + randomUUID().slice(0, 8)
+	const created = await request.fetch(dav(dir), { method: 'MKCOL', headers: { Authorization: authorization } })
+	expect(created.status()).toBe(201)
+	const formats = [
+		{ file: 'archive.tar.xz', mime: 'application/x-xz', fixtureName: 'valid.tar.xz' },
+		{ file: 'archive.zst', mime: 'application/zstd', fixtureName: 'valid.zst' },
+	]
+	try {
+		for (const format of formats) {
+			const archive = await readFile(new URL('../../Fixtures/' + format.fixtureName, import.meta.url))
+			const uploaded = await request.put(dav(dir + '/' + format.file), {
+				headers: { Authorization: authorization, 'Content-Type': format.mime },
+				data: archive,
+			})
+			expect(uploaded.status()).toBe(201)
+		}
+		await page.goto('/login')
+		await page.locator('#user').fill(user)
+		await page.locator('#password').fill(password)
+		await page.locator('button[type=submit]').click()
+		await expect(page.getByRole('button', { name: 'Settings menu' })).toBeVisible({ timeout: 30_000 })
+		await page.goto('/apps/files/files?dir=' + encodeURIComponent('/' + dir))
+		const onboarding = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: "What's new?" }) })
+		if (await onboarding.isVisible()) {
+			await onboarding.getByRole('button', { name: 'Close' }).click()
+		}
+		for (const format of formats) {
+			const row = page.locator('[data-cy-files-list-row-name="' + format.file + '"]')
+			await expect(row).toBeVisible({ timeout: 30_000 })
+			await row.getByRole('button', { name: 'Actions' }).click()
+			await page.getByRole('menuitem', { name: /Extract/i }).click()
+			const dialog = page.getByRole('dialog', { name: 'Extract archive' })
+			await expect(dialog).toBeVisible()
+			await dialog.getByRole('button', { name: 'Cancel' }).click()
+			await expect(dialog).toBeHidden()
+		}
+	} finally {
+		await deleteFile(request, dir)
+	}
+})
+
+/**
  * A recipient writing to a shared directory must extract into that recipient's
  * own Files view, not into an invisible or owner-only folder. Create everything
  * inside disposable CI Nextcloud; never touch real accounts or data.

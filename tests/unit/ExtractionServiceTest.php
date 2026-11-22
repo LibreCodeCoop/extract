@@ -301,6 +301,70 @@ final class ExtractionServiceTest extends TestCase {
 	}
 
 	/**
+	 * Zstandard is decoded with the modern full 7z executable. The binary
+	 * fixture avoids depending on zstd being installed for test generation.
+	 */
+	public function testExtractZstdDecodesAValidArchive(): void {
+		if (trim((string)shell_exec('command -v zstd 2>/dev/null || command -v 7z 2>/dev/null')) === '') {
+			self::markTestSkipped('Neither zstd nor full 7z is installed');
+		}
+		$archive = __DIR__ . '/../Fixtures/valid.zst';
+		$destination = $this->tmpDir . '/out';
+		$response = $this->service->extractZstd($archive, $destination);
+
+		self::assertSame(['code' => 1], $response);
+		self::assertSame("hello world\n", file_get_contents($destination . '/valid'));
+	}
+
+	/**
+	 * An external storage may hand the controller a temporary local file with
+	 * no archive extension. The client-supplied original filename is the only
+	 * source for the destination name, regardless of the temporary basename.
+	 */
+	public function testExtractZstdWithExtensionlessTemporaryArchive(): void {
+		if (trim((string)shell_exec('command -v zstd 2>/dev/null || command -v 7z 2>/dev/null')) === '') {
+			self::markTestSkipped('Neither zstd nor full 7z is installed');
+		}
+		$temporarySource = $this->tmpDir . '/archive-copy-without-extension';
+		self::assertTrue(copy(__DIR__ . '/../Fixtures/valid.zst', $temporarySource));
+		$destination = $this->tmpDir . '/out';
+		$response = $this->service->extractZstd($temporarySource, $destination, null, 'original-filename.zst');
+
+		self::assertSame(['code' => 1], $response);
+		self::assertSame("hello world\n", file_get_contents($destination . '/original-filename'));
+	}
+
+	/**
+	 * Zstandard does not expose a reliable expanded size in 7z listings.
+	 * The staging supervisor must still reject bytes exceeding a tight quota.
+	 */
+	public function testExtractZstdRejectsExceededDestinationQuota(): void {
+		if (trim((string)shell_exec('command -v zstd 2>/dev/null || command -v 7z 2>/dev/null')) === '') {
+			self::markTestSkipped('Neither zstd nor full 7z is installed');
+		}
+		$archive = __DIR__ . '/../Fixtures/valid.zst';
+		$response = $this->service->extractZstd($archive, $this->tmpDir . '/out', 5);
+
+		self::assertSame(0, $response['code']);
+		self::assertSame('Archive exceeds the allowed extraction size', $response['desc']);
+	}
+
+	/**
+	 * Do not report success for an arbitrary file masquerading as Zstandard.
+	 */
+	public function testExtractZstdRejectsCorruptInput(): void {
+		if (trim((string)shell_exec('command -v zstd 2>/dev/null || command -v 7z 2>/dev/null')) === '') {
+			self::markTestSkipped('Neither zstd nor full 7z is installed');
+		}
+		$archive = $this->tmpDir . '/corrupt.zst';
+		file_put_contents($archive, 'not zstandard');
+		$response = $this->service->extractZstd($archive, $this->tmpDir . '/out');
+
+		self::assertSame(0, $response['code']);
+		self::assertArrayHasKey('desc', $response);
+	}
+
+	/**
 	 * A rar archive without rar support reports failure.
 	 */
 	public function testExtractRarReportsFailureWhenNoRarSupportIsAvailable(): void {
