@@ -90,7 +90,7 @@ final class ExtractionService {
 	 * @return null|array{code: 0, desc: string}
 	 */
 	private function rejectUnsafeMetadata(string $line): ?array {
-		if (preg_match('/^(?:Symbolic Link|Hard Link|Junction|Reparse Point)\s*=/i', $line) !== 1
+		if (preg_match('/^(?:Symbolic Link|Hard Link|Junction|Reparse Point)\s*=\s*\S/i', $line) !== 1
 			&& !(str_starts_with($line, 'Attributes = ')
 				&& preg_match('/(?:^|\s)[lbpcs][-rwxstST]{9}(?:\s|$)/', $line) === 1)) {
 			return null;

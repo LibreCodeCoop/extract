@@ -256,6 +256,8 @@ final class ExtractionServiceTest extends TestCase {
 			'Attributes = D drwxr-xr-x',
 			'Attributes = A -rw-r--r--',
 			'Attributes = RA',
+			'Symbolic Link = ',
+			'Hard Link = ',
 			'Size = 1024',
 		] as $line) {
 			self::assertNull($method->invoke($this->service, $line), $line);
