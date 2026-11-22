@@ -27,6 +27,7 @@ final class ResourceLimitedProcess {
 			return ['success' => false, 'reason' => 'unavailable'];
 		}
 
+		$command = self::isolatedCommand($command, $isolated);
 		try {
 			$process = proc_open($command, [
 				0 => ['pipe', 'r'],
@@ -45,6 +46,7 @@ final class ResourceLimitedProcess {
 		stream_set_blocking($pipes[2], false);
 		$reason = null;
 		$exitCode = null;
+		$groupId = null;
 		$deadline = microtime(true) + $timeoutSeconds;
 		try {
 			while (true) {
@@ -76,6 +78,9 @@ final class ResourceLimitedProcess {
 					break;
 				}
 				$status = proc_get_status($process);
+				if ($isolated && $groupId === null) {
+					$groupId = self::processGroupId($status);
+				}
 				if (!$status['running']) {
 					$exitCode = $status['exitcode'];
 					break;
@@ -86,11 +91,7 @@ final class ResourceLimitedProcess {
 			$reason = 'inspection';
 		} finally {
 			if ($reason !== null) {
-				proc_terminate($process);
-				usleep(self::POLL_INTERVAL_US);
-				if (proc_get_status($process)['running']) {
-					proc_terminate($process, 9);
-				}
+				self::stopProcess($process, $groupId, $isolated);
 			}
 			fclose($pipes[1]);
 			fclose($pipes[2]);
@@ -128,6 +129,7 @@ final class ResourceLimitedProcess {
 		if ($maxOutputBytes < 1 || $timeoutSeconds < 1 || !function_exists('proc_open')) {
 			return ['success' => false, 'reason' => 'unavailable', 'output' => ''];
 		}
+		$command = self::isolatedCommand($command, $isolated);
 		try {
 			$process = proc_open($command, [
 				0 => ['pipe', 'r'],
@@ -148,6 +150,7 @@ final class ResourceLimitedProcess {
 		$capturedBytes = 0;
 		$reason = null;
 		$exitCode = null;
+		$groupId = null;
 		$deadline = hrtime(true) + (int)min($timeoutSeconds, 3600) * 1000000000;
 		try {
 			while (true) {
@@ -181,6 +184,9 @@ final class ResourceLimitedProcess {
 					break;
 				}
 				$status = proc_get_status($process);
+				if ($isolated && $groupId === null) {
+					$groupId = self::processGroupId($status);
+				}
 				if (!$status['running']) {
 					$exitCode = $status['exitcode'];
 					if (feof($pipes[1]) && feof($pipes[2])) {
@@ -193,11 +199,7 @@ final class ResourceLimitedProcess {
 			$reason = 'inspection';
 		} finally {
 			if ($reason !== null) {
-				proc_terminate($process);
-				usleep(self::POLL_INTERVAL_US);
-				if (proc_get_status($process)['running']) {
-					proc_terminate($process, 9);
-				}
+				self::stopProcess($process, $groupId, $isolated);
 			}
 			fclose($pipes[1]);
 			fclose($pipes[2]);
@@ -210,6 +212,62 @@ final class ResourceLimitedProcess {
 			$reason = 'exit';
 		}
 		return ['success' => $reason === null, 'reason' => $reason ?? '', 'output' => $output];
+	}
+
+	/**
+	 * Prefer a separate process session on Unix so timed-out decoders cannot
+	 * leave inherited child processes writing after the parent is terminated.
+	 *
+	 * @param non-empty-list<string> $command
+	 * @return non-empty-list<string>
+	 */
+	private static function isolatedCommand(array $command, bool &$isolated): array {
+		$isolated = false;
+		if (DIRECTORY_SEPARATOR !== '/' || !function_exists('posix_kill') || !function_exists('posix_getpgid')) {
+			return $command;
+		}
+		foreach (['/usr/bin/setsid', '/bin/setsid'] as $binary) {
+			if (is_executable($binary)) {
+				$isolated = true;
+				return [$binary, ...$command];
+			}
+		}
+		return $command;
+	}
+
+	/** @param array{pid: int, running: bool} $status */
+	private static function processGroupId(array $status): ?int {
+		$pid = $status['pid'];
+		if ($pid <= 1 || $pid === posix_getpgrp()) {
+			return null;
+		}
+		return @posix_getpgid($pid) === $pid ? $pid : null;
+	}
+
+	/**
+	 * Terminate the decoder session when available, then stop its direct child
+	 * as a fallback. Only signal a verified, distinct POSIX process group.
+	 *
+	 * @param resource $process
+	 */
+	private static function stopProcess($process, ?int $groupId, bool $isolated): void {
+		if ($isolated && $groupId === null) {
+			$groupId = self::processGroupId(proc_get_status($process));
+		}
+		if ($groupId !== null) {
+			@posix_kill(-$groupId, 15);
+			usleep(self::POLL_INTERVAL_US);
+			if (@posix_kill(-$groupId, 0)) {
+				@posix_kill(-$groupId, 9);
+			}
+		}
+		if (proc_get_status($process)['running']) {
+			proc_terminate($process);
+			usleep(self::POLL_INTERVAL_US);
+			if (proc_get_status($process)['running']) {
+				proc_terminate($process, 9);
+			}
+		}
 	}
 
 	private static function inspect(string $directory, int $maxBytes, int $maxEntries): ?string {
