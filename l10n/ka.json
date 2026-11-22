@@ -1,4 +1,6 @@
 { "translations": {
-    "File not found" : "File not found"
+    "File not found" : "File not found",
+    "Folder name" : "Folder name",
+    "Cancel" : "გაუქმება"
 },"pluralForm" :"nplurals=2; plural=(n!=1);"
 }

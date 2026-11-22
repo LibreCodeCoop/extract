@@ -1,13 +1,12 @@
 { "translations": {
-    "Encryption is not supported yet" : "Le chiffrement n’est pas encore supporté",
+    "Oops something went wrong." : "Oups, quelque chose s'est mal passé.",
     "File not found" : "Fichier non trouvé",
     "Zip extension is not available" : "L'extension zip n'est pas disponible",
     "Cannot open Zip file" : "Impossible d'ouvrir le fichier Zip",
     "Oops something went wrong. Check that you have rar extension or unrar installed" : "Oops une erreur est survenue. Veuillez vérifier que l'extension est bien en .rar ou que unrar est bien installé.",
-    "Oops something went wrong." : "Oups, quelque chose s'est mal passé.",
     "Extract" : "Extraire",
     "Extract archive from the web interface" : "Extraire l'archive depuis l'interface web",
-    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "Extraire les archives.\n\n* **Formats supportés :**\n\n* Zip\n* Rar\n* Tar\n* Gzip\n* 7z\n* Deb\n* Bzip2\n\n* **Requis :**\n* Rar PHP extension (pecl -v install rar)\n\n* **OU**\n* unrar (sudo apt-get install unrar)\n\n* **ET**\n* p7zip (sudo apt-get install p7zip p7zip-full)\n\n* **Note :** Les fichiers chiffrés ne sont pas supportés pour le moment.",
-    "Extract here" : "Extraire ici"
+    "Folder name" : "Nom du dossier",
+    "Cancel" : "Annuler"
 },"pluralForm" :"nplurals=3; plural=(n == 0 || n == 1) ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;"
 }

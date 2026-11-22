@@ -1,4 +1,6 @@
 { "translations": {
-    "File not found" : "Faýl tapylmady"
+    "File not found" : "Faýl tapylmady",
+    "Folder name" : "Papkanyň ady",
+    "Cancel" : "Cancel"
 },"pluralForm" :"nplurals=2; plural=(n != 1);"
 }

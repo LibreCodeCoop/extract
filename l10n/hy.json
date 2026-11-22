@@ -1,4 +1,6 @@
 { "translations": {
-    "File not found" : "Նիշքը չգտնվեց"
+    "File not found" : "Նիշքը չգտնվեց",
+    "Folder name" : "Պանակի անուն",
+    "Cancel" : "Cancel"
 },"pluralForm" :"nplurals=2; plural=(n != 1);"
 }

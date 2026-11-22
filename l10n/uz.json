@@ -1,4 +1,6 @@
 { "translations": {
-    "File not found" : "Fayl topilmadi"
+    "File not found" : "Fayl topilmadi",
+    "Folder name" : "Papka nomi",
+    "Cancel" : "Bekor qilish"
 },"pluralForm" :"nplurals=1; plural=0;"
 }
