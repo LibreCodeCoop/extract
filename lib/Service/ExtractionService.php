@@ -101,17 +101,36 @@ final class ExtractionService {
 
 	/** @return null|array{code: 0, desc: string} */
 	private function assertSafeRarShell(string $file): ?array {
-		$output = [];
-		$return = 0;
-		exec('unrar lb ' . escapeshellarg($file) . ' 2>&1', $output, $return);
-		if ($return !== 0) {
-			$this->logger->error('unrar list failed (rc=' . $return . '): ' . implode("\n", $output));
+		$output = $this->listWithLimits(['unrar', 'lb', $file]);
+		if ($output === null) {
 			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
 		}
 		foreach ($output as $entry) {
+			$entry = rtrim($entry, "\r");
 			if ($entry !== '' && ($error = $this->rejectUnsafe($entry))) {
 				return $error;
 			}
+		}
+		// The plain filename list does not reveal links. Inspect entry types
+		// before extraction, using 7z technical metadata when available.
+		if ($this->isCommandAvailable('7z')) {
+			return $this->assertSafeRarSevenZip($file);
+		}
+		$details = $this->listWithLimits(['unrar', 'lt', $file]);
+		if ($details === null) {
+			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
+		}
+		$types = 0;
+		foreach ($details as $line) {
+			if (preg_match('/^\s*Type\s*:\s*(.+)$/i', $line, $match) === 1) {
+				$types++;
+				if (preg_match('/^(?:File|Directory)$/i', trim($match[1])) !== 1) {
+					return ['code' => 0, 'desc' => $this->l->t('Archive contains links or unsupported special files')];
+				}
+			}
+		}
+		if ($types === 0) {
+			return ['code' => 0, 'desc' => $this->l->t('Could not verify RAR entry types')];
 		}
 		return null;
 	}
