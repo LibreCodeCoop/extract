@@ -16,6 +16,8 @@ use ZipArchive;
 final class ExtractionService {
 	private const DEFAULT_MAX_EXTRACTED_BYTES = 2147483648; // 2 GiB
 	private const DEFAULT_MAX_ARCHIVE_ENTRIES = 10000;
+	private const MAX_ARCHIVE_LISTING_BYTES = 16777216;
+	private const ARCHIVE_LIST_TIMEOUT_SECONDS = 20;
 
 	public function __construct(
 		private IL10N $l,
@@ -62,6 +64,41 @@ final class ExtractionService {
 		return null;
 	}
 
+	/**
+	 * Run archive listing with a bounded output size and an execution deadline.
+	 *
+	 * @param non-empty-list<string> $command
+	 * @return ?list<string>
+	 */
+	private function listWithLimits(array $command): ?array {
+		$result = ResourceLimitedProcess::capture(
+			$command,
+			self::MAX_ARCHIVE_LISTING_BYTES,
+			self::ARCHIVE_LIST_TIMEOUT_SECONDS,
+		);
+		if (!$result['success']) {
+			$this->logger->warning('Archive listing rejected: ' . $result['reason']);
+			return null;
+		}
+		return explode("\n", $result['output']);
+	}
+
+	/**
+	 * Refuse archive links and special nodes before starting any extractor.
+	 * A periodic filesystem scan does not prevent intermediate unsafe writes.
+	 *
+	 * @return null|array{code: 0, desc: string}
+	 */
+	private function rejectUnsafeMetadata(string $line): ?array {
+		if (preg_match('/^(?:Symbolic Link|Hard Link|Junction|Reparse Point)\s*=/i', $line) !== 1
+			&& !(str_starts_with($line, 'Attributes = ')
+				&& preg_match('/(?:^|\s)[lbpcs][-rwxstST]{9}(?:\s|$)/', $line) === 1)) {
+			return null;
+		}
+		$this->logger->warning('Refusing archive with links or special files');
+		return ['code' => 0, 'desc' => $this->l->t('Archive contains links or unsupported special files')];
+	}
+
 	/** @return null|array{code: 0, desc: string} */
 	private function assertSafeRarShell(string $file): ?array {
 		$output = [];
@@ -88,11 +125,8 @@ final class ExtractionService {
 	 * @return null|array{code: 0, desc: string}
 	 */
 	private function assertSafe7z(string $file, ?int $availableBytes, ?int $temporarySpace): ?array {
-		$output = [];
-		$return = 0;
-		exec('7za l -ba -slt ' . escapeshellarg($file) . ' 2>&1', $output, $return);
-		if ($return !== 0) {
-			$this->logger->error('7za list failed (rc=' . $return . '): ' . implode("\n", $output));
+		$output = $this->listWithLimits(['7za', 'l', '-ba', '-slt', $file]);
+		if ($output === null) {
 			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect archive contents')];
 		}
 		$budget = $this->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
@@ -106,6 +140,10 @@ final class ExtractionService {
 		$entries = 0;
 		$size = 0;
 		foreach ($output as $line) {
+			$line = rtrim($line, "\r");
+			if ($error = $this->rejectUnsafeMetadata($line)) {
+				return $error;
+			}
 			if (str_starts_with($line, 'Path = ')) {
 				if ($error = $this->rejectUnsafe(substr($line, 7))) {
 					return $error;
@@ -375,14 +413,15 @@ final class ExtractionService {
 	 * @return null|array{code: 0, desc: string}
 	 */
 	private function assertSafeRarSevenZip(string $file): ?array {
-		$output = [];
-		$return = 0;
-		exec('7z l -ba -slt ' . escapeshellarg($file) . ' 2>&1', $output, $return);
-		if ($return !== 0) {
-			$this->logger->error('7z RAR listing failed (rc=' . $return . '): ' . implode("\n", $output));
+		$output = $this->listWithLimits(['7z', 'l', '-ba', '-slt', $file]);
+		if ($output === null) {
 			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
 		}
 		foreach ($output as $line) {
+			$line = rtrim($line, "\r");
+			if ($error = $this->rejectUnsafeMetadata($line)) {
+				return $error;
+			}
 			if (str_starts_with($line, 'Path = ')) {
 				if ($error = $this->rejectUnsafe(substr($line, 7))) {
 					return $error;
