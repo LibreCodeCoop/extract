@@ -447,9 +447,8 @@ final class ExtractionService {
 			if ($entries === false) {
 				return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
 			}
-			if (count($entries) > $this->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES)) {
-				return ['code' => 0, 'desc' => $this->l->t('Archive contains too many files')];
-			}
+			$entryLimit = $this->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES);
+			$entryCount = 0;
 			$budget = $this->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
 			if ($availableBytes !== null && $availableBytes >= 0) {
 				$budget = min($budget, $availableBytes);
@@ -461,6 +460,9 @@ final class ExtractionService {
 			$declared = 0;
 			$paths = [];
 			foreach ($entries as $entry) {
+				if (++$entryCount > $entryLimit) {
+					return ['code' => 0, 'desc' => $this->l->t('Archive contains too many files')];
+				}
 				$name = str_replace('\\', '/', $entry->getName());
 				$relative = rtrim($name, '/');
 				if ($relative === '' || preg_match('//u', $relative) !== 1 || isset($paths[$relative])) {

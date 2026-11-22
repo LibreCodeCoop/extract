@@ -27,6 +27,7 @@ final class ResourceLimitedProcess {
 			return ['success' => false, 'reason' => 'unavailable'];
 		}
 
+		$isolated = false;
 		$command = self::isolatedCommand($command, $isolated);
 		try {
 			$process = proc_open($command, [
@@ -129,6 +130,7 @@ final class ResourceLimitedProcess {
 		if ($maxOutputBytes < 1 || $timeoutSeconds < 1 || !function_exists('proc_open')) {
 			return ['success' => false, 'reason' => 'unavailable', 'output' => ''];
 		}
+		$isolated = false;
 		$command = self::isolatedCommand($command, $isolated);
 		try {
 			$process = proc_open($command, [
@@ -235,7 +237,7 @@ final class ResourceLimitedProcess {
 		return $command;
 	}
 
-	/** @param array{pid: int, running: bool} $status */
+	/** @param array{pid: int, running: bool, command: string, exitcode: int, signaled: bool, stopped: bool, stopsig: int, termsig: int} $status */
 	private static function processGroupId(array $status): ?int {
 		$pid = $status['pid'];
 		if ($pid <= 1 || $pid === posix_getpgrp()) {
