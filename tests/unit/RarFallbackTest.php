@@ -16,10 +16,10 @@ use Psr\Log\LoggerInterface;
 
 final class RarFallbackTest extends TestCase {
 	/**
-	 * Small RAR 2 fixture adapted from libarchive's freely distributed
-	 * test_read_format_rar.rar.uu (libarchive/test), unmodified contents.
+	 * Small RAR5 stored-file fixture adapted from libarchive's freely distributed
+	 * test_read_format_rar5_stored.rar.uu (libarchive/test), unmodified contents.
 	 */
-	private const RAR_FIXTURE = 'UmFyIRoHAM+QcwAADQAAAAAAAACEUnQgkDIAFAAAABQAAAADQqLIvrd22j4UMAgApIEAAHRlc3QudHh0gAi3dto+t3baPnRlc3QgdGV4dCBkb2N1bWVudA0KnS90IJAyAAgAAAAIAAAAA3tEybbRTNg+FDAIAP+hAAB0ZXN0bGlua8AI0UzYPlBf2j50ZXN0LnR4dM3gdCCQOgAUAAAAFAAAAANCosi+Y3faPhQwEACkgQAAdGVzdGRpclx0ZXN0LnR4dMDMY3faPmN32j50ZXN0IHRleHQgZG9jdW1lbnQNCqHIdOCQMQAAAAAAAAAAAAMAAAAAY3faPhQwBwDtQQAAdGVzdGRpcsDMY3faPmR32j7m53TgkDYAAAAAAAAAAAADAAAAAJ2r1T4UMAwA7UEAAHRlc3RlbXB0eWRpcoDMnavVPsVd2j7EPXsAQAcA';
+	private const RAR_FIXTURE = 'UmFyIRoHAQAzkrXlCgEFBgAFAQGAgAA4MAZjLAIDC50ABJ0ApIMCtEOglYAAAQ5oZWxsb3dvcmxkLnR4dAoDE34Oq1tW6Q4aaGVsbG8gbGliYXJjaGl2ZSB0ZXN0IHN1aXRlIQodd1ZRAwUEAA==';
 
 	public function testRarUsesFullSevenZipWhenUnrarIsUnavailable(): void {
 		if (extension_loaded('rar') || trim((string)shell_exec('command -v unrar 2>/dev/null')) !== '') {
@@ -41,8 +41,7 @@ final class RarFallbackTest extends TestCase {
 		try {
 			$result = $service->extractRar($archive, $destination);
 			self::assertSame(['code' => 1], $result);
-			self::assertSame("test text document\r\n", file_get_contents($destination . '/test.txt'));
-			self::assertSame("test text document\r\n", file_get_contents($destination . '/testdir/test.txt'));
+			self::assertSame("hello libarchive test suite!\n", file_get_contents($destination . '/helloworld.txt'));
 		} finally {
 			if (is_dir($destination)) {
 				$files = new \RecursiveIteratorIterator(

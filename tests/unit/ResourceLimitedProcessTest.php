@@ -67,6 +67,17 @@ final class ResourceLimitedProcessTest extends TestCase {
 		self::assertSame(['success' => false, 'reason' => 'timeout'], $result);
 	}
 
+
+	public function testRejectsStagedSymbolicLinks(): void {
+		if (!function_exists('symlink')) {
+			self::markTestSkipped('Symbolic links are unavailable on this platform');
+		}
+		$result = ResourceLimitedProcess::run([
+			PHP_BINARY, '-r', 'symlink("somewhere-outside", $argv[1] . "/link");', $this->directory,
+		], $this->directory, 50, 2, 3);
+		self::assertSame(['success' => false, 'reason' => 'symlink'], $result);
+	}
+
 	public function testDoesNotAcceptNonZeroExit(): void {
 		$result = ResourceLimitedProcess::run([
 			PHP_BINARY, '-r', 'exit(9);',
