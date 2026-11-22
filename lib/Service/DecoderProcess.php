@@ -30,7 +30,11 @@ final class DecoderProcess {
 	 * @param resource $process
 	 * @param array<int, resource> $pipes
 	 */
-	private function __construct($process, array $pipes, private readonly bool $isolated) {
+	private function __construct(
+		$process,
+		array $pipes,
+		private readonly bool $isolated,
+	) {
 		$this->process = $process;
 		$this->pipes = $pipes;
 	}
