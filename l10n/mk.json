@@ -1,13 +1,12 @@
 { "translations": {
-    "Encryption is not supported yet" : "Шифрирање сеуште не е поддржано",
+    "Oops something went wrong." : "Нешто не е во ред.",
     "File not found" : "Датотеката не е пронајдена",
     "Zip extension is not available" : "Zip екстензијата не е достапна",
     "Cannot open Zip file" : "Неможе да се отвори Zip датотеката",
     "Oops something went wrong. Check that you have rar extension or unrar installed" : "Настана грешка. Проверете дали имате инсталирано додаток за rar екстензии или unrar",
-    "Oops something went wrong." : "Нешто не е во ред.",
     "Extract" : "Отпакувај",
     "Extract archive from the web interface" : "Отпакување архиви од веб прелистувач",
-    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "Одпакување на архиви.\n\n*  **Поддржани :** \n\n    * Zip \n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Барања :** \n    * Rar PHP додаток (pecl -v install rar)\n\n    * **ИЛИ** \n    * unrar (sudo apt-get install unrar)\n\n    * **И**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Забелешка :** Криптирани датотеки не се поддржани",
-    "Extract here" : "Отпакувај овде"
+    "Folder name" : "Име на папка",
+    "Cancel" : "Откажи"
 },"pluralForm" :"nplurals=2; plural=(n % 10 == 1 && n % 100 != 11) ? 0 : 1;"
 }

@@ -1,11 +1,11 @@
 { "translations": {
-    "Encryption is not supported yet" : "Šifriranje još uvijek nije podržano",
     "File not found" : "Datoteka nije pronađena",
     "Zip extension is not available" : "Nastavak „zip“ nije dostupan",
     "Cannot open Zip file" : "Nije moguće otvoriti datoteku Zip",
     "Oops something went wrong. Check that you have rar extension or unrar installed" : "Ups! Nešto je pošlo po krivu. Provjerite je li instalirano proširenje za datoteke rar ili unrar",
     "Extract" : "Izdvoji",
     "Extract archive from the web interface" : "Izdvoji arhivu putem web-sučelja",
-    "Extract here" : "Izdvoji ovdje"
+    "Folder name" : "Naziv mape",
+    "Cancel" : "Otkaži"
 },"pluralForm" :"nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;"
 }

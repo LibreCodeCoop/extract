@@ -1,4 +1,6 @@
 { "translations": {
-    "File not found" : "Datei net fonnt"
+    "File not found" : "Datei net fonnt",
+    "Folder name" : "Dossiers Numm:",
+    "Cancel" : "Cancel"
 },"pluralForm" :"nplurals=2; plural=(n != 1);"
 }

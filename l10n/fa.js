@@ -1,15 +1,14 @@
 OC.L10N.register(
     "extract",
     {
-    "Encryption is not supported yet" : "رمزگذاری هنوز پشتیبانی نمی‌شود",
+    "Oops something went wrong." : "اوه، مشکلی پیش آمد",
     "File not found" : "فایل پیدا نشد",
     "Zip extension is not available" : "افزونه Zip در دسترس نیست",
     "Cannot open Zip file" : "نمی‌توان فایل Zip را باز کرد",
     "Oops something went wrong. Check that you have rar extension or unrar installed" : "اوه، مشکلی پیش آمد. مطمئن شوید که افزونه rar یا unrar نصب شده است",
-    "Oops something went wrong." : "اوه، مشکلی پیش آمد",
     "Extract" : "استخراج",
     "Extract archive from the web interface" : "استخراج بایگانی از رابط وب",
-    "Extract archives.\n\n*  **Supported :**\n\n    * Zip\n    * Rar\n    * Tar\n    * Gzip\n    * 7z\n    * Deb\n    * Bzip2\n\n*  **Requirements :**\n    * Rar PHP extension  (pecl -v install rar)\n\n    * **OR**\n    * unrar (sudo apt-get install unrar)\n\n    * **AND**\n    * p7zip (sudo apt-get install p7zip p7zip-full)\n\n*  **Note :** Encrypted files are not supported yet" : "استخراج بایگانی‌ها",
-    "Extract here" : "استخراج در اینجا"
+    "Folder name" : "نام پوشه",
+    "Cancel" : "انصراف"
 },
 "nplurals=2; plural=(n > 1);");
