@@ -19,183 +19,25 @@ final class ExtractionService {
 	private const MAX_ARCHIVE_LISTING_BYTES = 16777216;
 	private const ARCHIVE_LIST_TIMEOUT_SECONDS = 20;
 
+	private ArchiveSafetyValidator $safety;
+	private ExtractionLimits $limits;
+
 	public function __construct(
 		private IL10N $l,
 		private LoggerInterface $logger,
 		private IConfig $config,
 	) {
+		$this->safety = new ArchiveSafetyValidator($l, $logger);
+		$this->limits = new ExtractionLimits($config);
 	}
 
-	/**
-	 * Reject archive names that may escape the extraction staging directory,
-	 * including absolute, Windows drive and traversal paths.
-	 */
-	private function isUnsafePath(string $entry): bool {
-		$path = str_replace('\\', '/', $entry);
-		if (preg_match('/[\x00-\x1f\x7f]/', $entry) === 1) {
-			return true;
-		}
-		if (str_starts_with($path, '/') || preg_match('/^[a-zA-Z]:/', $path) === 1) {
-			return true;
-		}
-		return preg_match('#(^|/)\.\.($|/)#', $path) === 1;
-	}
 
-	/** @return null|array{code: 0, desc: string} */
-	private function rejectUnsafe(string $entry): ?array {
-		if (!$this->isUnsafePath($entry)) {
-			return null;
-		}
-		$this->logger->warning('Refusing archive with unsafe entry');
-		return ['code' => 0, 'desc' => $this->l->t('Archive contains an unsafe path and was not extracted')];
-	}
 
-	/** @return null|array{code: 0, desc: string} */
-	private function assertSafeZip(ZipArchive $zip): ?array {
-		for ($i = 0; $i < $zip->numFiles; $i++) {
-			$name = $zip->getNameIndex($i);
-			if ($name === false) {
-				return ['code' => 0, 'desc' => $this->l->t('Failed to read archive index')];
-			}
-			if ($error = $this->rejectUnsafe($name)) {
-				return $error;
-			}
-		}
-		return null;
-	}
 
-	/**
-	 * Run archive listing with a bounded output size and an execution deadline.
-	 *
-	 * @param non-empty-list<string> $command
-	 * @return ?list<string>
-	 */
-	private function listWithLimits(array $command): ?array {
-		$result = ResourceLimitedProcess::capture(
-			$command,
-			self::MAX_ARCHIVE_LISTING_BYTES,
-			self::ARCHIVE_LIST_TIMEOUT_SECONDS,
-		);
-		if (!$result['success']) {
-			$this->logger->warning('Archive listing rejected: ' . $result['reason']);
-			return null;
-		}
-		return explode("\n", $result['output']);
-	}
 
-	/**
-	 * Refuse archive links and special nodes before starting any extractor.
-	 * A periodic filesystem scan does not prevent intermediate unsafe writes.
-	 *
-	 * @return null|array{code: 0, desc: string}
-	 */
-	private function rejectUnsafeMetadata(string $line): ?array {
-		if (preg_match('/^(?:Symbolic Link|Hard Link|Junction|Reparse Point)\s*=\s*\S/i', $line) !== 1
-			&& !(str_starts_with($line, 'Attributes = ')
-				&& preg_match('/(?:^|\s)[lbpcs][-rwxstST]{9}(?:\s|$)/', $line) === 1)) {
-			return null;
-		}
-		$this->logger->warning('Refusing archive with links or special files');
-		return ['code' => 0, 'desc' => $this->l->t('Archive contains links or unsupported special files')];
-	}
 
-	/** @return null|array{code: 0, desc: string} */
-	private function assertSafeRarShell(string $file): ?array {
-		$output = $this->listWithLimits(['unrar', 'lb', $file]);
-		if ($output === null) {
-			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
-		}
-		foreach ($output as $entry) {
-			$entry = rtrim($entry, "\r");
-			if ($entry !== '' && ($error = $this->rejectUnsafe($entry))) {
-				return $error;
-			}
-		}
-		// The plain filename list does not reveal links. Inspect entry types
-		// before extraction, using 7z technical metadata when available.
-		if ($this->isCommandAvailable('7z')) {
-			return $this->assertSafeRarSevenZip($file);
-		}
-		$details = $this->listWithLimits(['unrar', 'lt', $file]);
-		if ($details === null) {
-			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
-		}
-		$types = 0;
-		foreach ($details as $line) {
-			if (preg_match('/^\s*Type\s*:\s*(.+)$/i', $line, $match) === 1) {
-				$types++;
-				if (preg_match('/^(?:File|Directory)$/i', trim($match[1])) !== 1) {
-					return ['code' => 0, 'desc' => $this->l->t('Archive contains links or unsupported special files')];
-				}
-			}
-		}
-		if ($types === 0) {
-			return ['code' => 0, 'desc' => $this->l->t('Could not verify RAR entry types')];
-		}
-		return null;
-	}
 
-	/**
-	 * Validate 7za archive paths and reject metadata announcing extraction
-	 * beyond the available quota, staging space, or configured resource caps.
-	 * The external decoder may still misreport sizes; this is a preflight,
-	 * not a substitute for process-level disk isolation.
-	 *
-	 * @return null|array{code: 0, desc: string}
-	 */
-	private function assertSafe7z(string $file, ?int $availableBytes, ?int $temporarySpace): ?array {
-		$output = $this->listWithLimits(['7za', 'l', '-ba', '-slt', $file]);
-		if ($output === null) {
-			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect archive contents')];
-		}
-		$budget = $this->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
-		if ($availableBytes !== null && $availableBytes >= 0) {
-			$budget = min($budget, $availableBytes);
-		}
-		if ($temporarySpace !== null && $temporarySpace >= 0) {
-			$budget = min($budget, $temporarySpace);
-		}
-		$entryLimit = $this->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES);
-		$entries = 0;
-		$size = 0;
-		foreach ($output as $line) {
-			$line = rtrim($line, "\r");
-			if ($error = $this->rejectUnsafeMetadata($line)) {
-				return $error;
-			}
-			if (str_starts_with($line, 'Path = ')) {
-				if ($error = $this->rejectUnsafe(substr($line, 7))) {
-					return $error;
-				}
-				$entries++;
-				if ($entries > $entryLimit) {
-					return ['code' => 0, 'desc' => $this->l->t('Archive contains too many files')];
-				}
-			} elseif (str_starts_with($line, 'Size = ')) {
-				$declaredSize = filter_var(trim(substr($line, 7)), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
-				if ($declaredSize === false) {
-					return ['code' => 0, 'desc' => $this->l->t('Failed to inspect archive contents')];
-				}
-				if ($declaredSize > $budget - $size) {
-					return ['code' => 0, 'desc' => $this->l->t('Archive exceeds the allowed extraction size')];
-				}
-				$size += $declaredSize;
-			}
-		}
-		return null;
-	}
 
-	/**
-	 * Read a positive integer resource limit from application configuration.
-	 * Invalid or overflowing values are ignored instead of disabling protection.
-	 */
-	private function configuredLimit(string $key, int $default): int {
-		$value = $this->config->getAppValue('extract', $key, (string)$default);
-		if (!is_string($value) || filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) === false) {
-			return $default;
-		}
-		return (int)$value;
-	}
 
 	/**
 	 * Extract ZIP entries through bounded streams, never via an unbounded
@@ -221,7 +63,7 @@ final class ExtractionService {
 				return $error;
 			}
 
-			$limit = $this->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
+			$limit = $this->limits->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
 			if ($availableBytes !== null && $availableBytes >= 0) {
 				$limit = min($limit, $availableBytes);
 			}
@@ -229,7 +71,7 @@ final class ExtractionService {
 			if ($temporarySpace !== false) {
 				$limit = min($limit, (int)$temporarySpace);
 			}
-			if ($zip->numFiles > $this->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES)) {
+			if ($zip->numFiles > $this->limits->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES)) {
 				return ['code' => 0, 'desc' => $this->l->t('Archive contains too many files')];
 			}
 
@@ -327,7 +169,7 @@ final class ExtractionService {
 	 * @return array{code: 0|1, desc?: string}
 	 */
 	private function runExternalDecoder(array $command, string $extractTo, ?int $availableBytes = null): array {
-		$limit = $this->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
+		$limit = $this->limits->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
 		if ($availableBytes !== null && $availableBytes >= 0) {
 			$limit = min($limit, $availableBytes);
 		}
@@ -339,8 +181,8 @@ final class ExtractionService {
 			$command,
 			$extractTo,
 			$limit,
-			$this->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES),
-			$this->configuredLimit('max_extraction_seconds', 300),
+			$this->limits->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES),
+			$this->limits->configuredLimit('max_extraction_seconds', 300),
 		);
 		if (!$result['success']) {
 			$this->logger->warning('Archive decoder stopped: ' . $result['reason']);
@@ -447,9 +289,9 @@ final class ExtractionService {
 			if ($entries === false) {
 				return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
 			}
-			$entryLimit = $this->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES);
+			$entryLimit = $this->limits->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES);
 			$entryCount = 0;
-			$budget = $this->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
+			$budget = $this->limits->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
 			if ($availableBytes !== null && $availableBytes >= 0) {
 				$budget = min($budget, $availableBytes);
 			}
@@ -468,7 +310,7 @@ final class ExtractionService {
 				if ($relative === '' || preg_match('//u', $relative) !== 1 || isset($paths[$relative])) {
 					return ['code' => 0, 'desc' => $this->l->t('Archive contains an invalid filename')];
 				}
-				if ($error = $this->rejectUnsafe($name)) {
+				if ($error = $this->safety->rejectUnsafe($name)) {
 					return $error;
 				}
 				$paths[$relative] = true;
@@ -494,7 +336,7 @@ final class ExtractionService {
 				return ['code' => 0, 'desc' => $this->l->t('Could not prepare extraction directory')];
 			}
 			$written = 0;
-			$deadline = hrtime(true) + min($this->configuredLimit('max_extraction_seconds', 300), 3600) * 1000000000;
+			$deadline = hrtime(true) + min($this->limits->configuredLimit('max_extraction_seconds', 300), 3600) * 1000000000;
 			foreach ($entries as $entry) {
 				$name = rtrim(str_replace('\\', '/', $entry->getName()), '/');
 				$target = $extractTo . '/' . $name;
@@ -559,11 +401,11 @@ final class ExtractionService {
 		}
 		foreach ($output as $line) {
 			$line = rtrim($line, "\r");
-			if ($error = $this->rejectUnsafeMetadata($line)) {
+			if ($error = $this->safety->rejectUnsafeMetadata($line)) {
 				return $error;
 			}
 			if (str_starts_with($line, 'Path = ')) {
-				if ($error = $this->rejectUnsafe(substr($line, 7))) {
+				if ($error = $this->safety->rejectUnsafe(substr($line, 7))) {
 					return $error;
 				}
 			}
