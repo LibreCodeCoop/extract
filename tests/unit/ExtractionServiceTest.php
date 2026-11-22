@@ -41,7 +41,7 @@ final class ExtractionServiceTest extends TestCase {
 		);
 		$this->logger = $this->createStub(LoggerInterface::class);
 
-		$this->service = new ExtractionService($this->l10n, $this->logger);
+		$this->service = new ExtractionService($this->l10n, $this->logger, $this->createStub(\OCP\IConfig::class));
 
 		$this->tmpDir = sys_get_temp_dir() . '/extract-test-' . bin2hex(random_bytes(6));
 		if (mkdir($this->tmpDir, 0777, true) === false && is_dir($this->tmpDir) === false) {
@@ -173,6 +173,131 @@ final class ExtractionServiceTest extends TestCase {
 		self::assertSame(['code' => 1], $response);
 		self::assertFileExists($destination . '/hello.txt');
 		self::assertSame("hello world\n", file_get_contents($destination . '/hello.txt'));
+	}
+
+	/**
+	 * The 7za listing must preflight the declared uncompressed size against
+	 * the same Nextcloud destination quota used for ZIP.
+	 */
+	public function testRejects7zThatExceedsDestinationQuota(): void {
+		if (trim((string)shell_exec('command -v 7za 2>/dev/null')) === '') {
+			self::markTestSkipped('7za is not installed');
+		}
+		$archive = __DIR__ . '/../Fixtures/valid.7z';
+		$out = $this->tmpDir . '/out';
+
+		$response = $this->service->extractOther($archive, $out, 5);
+
+		self::assertSame(0, $response['code']);
+		self::assertSame('Archive exceeds the allowed extraction size', $response['desc']);
+		self::assertDirectoryDoesNotExist($out);
+	}
+
+	/**
+	 * The regular-sized fixture must still extract when the available quota
+	 * covers its declared uncompressed bytes.
+	 */
+	public function testExtracts7zWithinDestinationQuota(): void {
+		if (trim((string)shell_exec('command -v 7za 2>/dev/null')) === '') {
+			self::markTestSkipped('7za is not installed');
+		}
+		$archive = __DIR__ . '/../Fixtures/valid.7z';
+		$out = $this->tmpDir . '/out';
+
+		$response = $this->service->extractOther($archive, $out, 100);
+
+		self::assertSame(['code' => 1], $response);
+		self::assertSame("hello world\n", file_get_contents($out . '/hello.txt'));
+	}
+
+	/**
+	 * TAR is handled by the external 7za decoder too: its declared size must
+	 * be checked before any output is staged. A permitted quota is the
+	 * positive control using the exact same synthetic archive.
+	 */
+	public function testTarArchiveRespectsDestinationQuota(): void {
+		if (trim((string)shell_exec('command -v 7za 2>/dev/null')) === '') {
+			self::markTestSkipped('7za is not installed');
+		}
+		$archive = $this->tmpDir . '/quota.tar';
+		$tar = new \PharData($archive);
+		$tar->addFromString('payload.txt', str_repeat('x', 256));
+		unset($tar);
+
+		$denied = $this->tmpDir . '/denied';
+		$failure = $this->service->extractOther($archive, $denied, 64);
+		self::assertSame(0, $failure['code']);
+		self::assertSame('Archive exceeds the allowed extraction size', $failure['desc']);
+		self::assertDirectoryDoesNotExist($denied);
+
+		$allowed = $this->tmpDir . '/allowed';
+		self::assertSame(['code' => 1], $this->service->extractOther($archive, $allowed, 512));
+		self::assertSame(str_repeat('x', 256), file_get_contents($allowed . '/payload.txt'));
+	}
+
+
+
+
+
+
+
+
+	/**
+	 * A decompression bomb must be refused before staging any files when the
+	 * total uncompressed content cannot fit the user's Nextcloud quota.
+	 */
+	public function testRejectsZipExceedingDestinationQuotaBeforeWriting(): void {
+		$archive = $this->tmpDir . '/too-large.zip';
+		$this->createZip($archive, ['large.txt' => str_repeat('x', 100)]);
+		$out = $this->tmpDir . '/out';
+
+		$response = $this->service->extractZip($archive, $out, 50);
+
+		self::assertSame(0, $response['code']);
+		self::assertSame('Archive exceeds the allowed extraction size', $response['desc']);
+		self::assertDirectoryDoesNotExist($out);
+	}
+
+	/**
+	 * A configurable entry count rejects an archive with excessive file-count
+	 * amplification, without creating the output directory.
+	 */
+	public function testRejectsZipWithTooManyEntries(): void {
+		$archive = $this->tmpDir . '/too-many.zip';
+		$this->createZip($archive, ['first.txt' => 'a', 'second.txt' => 'b']);
+		$config = $this->createStub(\OCP\IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static fn (string $app, string $key, string $default): string => $key === 'max_archive_entries' ? '1' : $default,
+		);
+		$service = new ExtractionService($this->l10n, $this->logger, $config);
+		$out = $this->tmpDir . '/out';
+
+		$response = $service->extractZip($archive, $out);
+
+		self::assertSame(0, $response['code']);
+		self::assertSame('Archive contains too many files', $response['desc']);
+		self::assertDirectoryDoesNotExist($out);
+	}
+
+	/**
+	 * Bounded streaming still preserves UTF-8 paths, nested directories and
+	 * archive contents for legitimate files.
+	 */
+	public function testStreamedZipPreservesUnicodeNames(): void {
+		$archive = $this->tmpDir . '/unicode.zip';
+		$this->createZip($archive, [
+			'Café.txt' => 'cafe',
+			'한국어/전자책.txt' => 'korean',
+			'中文.txt' => 'chinese',
+		]);
+		$out = $this->tmpDir . '/out';
+
+		$response = $this->service->extractZip($archive, $out);
+
+		self::assertSame(['code' => 1], $response);
+		self::assertSame('cafe', file_get_contents($out . '/Café.txt'));
+		self::assertSame('korean', file_get_contents($out . '/한국어/전자책.txt'));
+		self::assertSame('chinese', file_get_contents($out . '/中文.txt'));
 	}
 
 	/**

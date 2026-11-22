@@ -54,7 +54,7 @@ final class WrappedTarballExtractionTest extends TestCase {
 		$reflection = new \ReflectionClass(ExtractionController::class);
 		$this->controller = $reflection->newInstanceWithoutConstructor();
 
-		$this->setProperty('extractionService', new ExtractionService($l10n, $this->createStub(LoggerInterface::class)));
+		$this->setProperty('extractionService', new ExtractionService($l10n, $this->createStub(LoggerInterface::class), $this->createStub(\OCP\IConfig::class)));
 		$this->setProperty('logger', $this->createStub(LoggerInterface::class));
 		$this->setProperty('l', $l10n);
 	}
