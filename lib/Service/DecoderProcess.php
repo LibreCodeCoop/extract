@@ -24,6 +24,7 @@ final class DecoderProcess {
 	private ?int $exitCode = null;
 	private ?int $groupId = null;
 	private int $outputBytes = 0;
+	private bool $drainedSinceLastPoll = false;
 	private string $output = '';
 
 	/**
@@ -71,6 +72,7 @@ final class DecoderProcess {
 	 * listings, limit the combined bytes while only retaining stdout.
 	 */
 	public function drain(?int $outputLimit): ?string {
+		$this->drainedSinceLastPoll = false;
 		$remaining = self::MAX_DRAIN_PER_POLL;
 		foreach ([1, 2] as $index) {
 			while ($remaining > 0) {
@@ -82,6 +84,7 @@ final class DecoderProcess {
 					break;
 				}
 				$length = strlen($chunk);
+				$this->drainedSinceLastPoll = true;
 				$remaining -= $length;
 				if ($outputLimit !== null) {
 					if ($length > $outputLimit - $this->outputBytes) {
@@ -95,6 +98,11 @@ final class DecoderProcess {
 			}
 		}
 		return null;
+	}
+
+	/** Whether the last drain pass consumed bytes from either process pipe. */
+	public function hadOutput(): bool {
+		return $this->drainedSinceLastPoll;
 	}
 
 	public function hasExited(): bool {
