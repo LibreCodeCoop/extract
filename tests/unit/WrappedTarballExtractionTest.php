@@ -54,7 +54,7 @@ final class WrappedTarballExtractionTest extends TestCase {
 		$reflection = new \ReflectionClass(ExtractionController::class);
 		$this->controller = $reflection->newInstanceWithoutConstructor();
 
-		$this->setProperty('extractionService', new ExtractionService($l10n, $this->createStub(LoggerInterface::class)));
+		$this->setProperty('extractionService', new ExtractionService($l10n, $this->createStub(LoggerInterface::class), $this->createStub(\OCP\IConfig::class)));
 		$this->setProperty('logger', $this->createStub(LoggerInterface::class));
 		$this->setProperty('l', $l10n);
 	}
@@ -172,6 +172,37 @@ final class WrappedTarballExtractionTest extends TestCase {
 		self::assertSame(0, $response['code']);
 		self::assertArrayHasKey('desc', $response);
 		self::assertDirectoryDoesNotExist($destination);
+	}
+
+	/**
+	 * XZ-compressed tarballs use the established supervised two-pass decoder.
+	 */
+	public function testTarXzIsUnpackedFromFixture(): void {
+		$archive = __DIR__ . '/../Fixtures/valid.tar.xz';
+		$destination = $this->tmpDir . '/xz-result';
+		$method = new \ReflectionMethod(ExtractionController::class, 'extractWrappedTarball');
+		$response = $method->invoke($this->controller, $archive, $destination);
+
+		self::assertSame(['code' => 1], $response);
+		self::assertSame("hello world\n", file_get_contents($destination . '/hello.txt'));
+		self::assertSame([], glob($destination . '.unwrapped*') ?: []);
+	}
+
+	/**
+	 * TAR+Zstandard first uses modern full 7z, then expands the inner tar.
+	 */
+	public function testTarZstdIsUnpackedFromFixture(): void {
+		if (trim((string)shell_exec('command -v zstd 2>/dev/null || command -v 7z 2>/dev/null')) === '') {
+			self::markTestSkipped('Neither zstd nor full 7z is installed');
+		}
+		$archive = __DIR__ . '/../Fixtures/valid.tar.zst';
+		$destination = $this->tmpDir . '/zstd-result';
+		$method = new \ReflectionMethod(ExtractionController::class, 'extractWrappedTarball');
+		$response = $method->invoke($this->controller, $archive, $destination, null, true);
+
+		self::assertSame(['code' => 1], $response);
+		self::assertSame("hello world\n", file_get_contents($destination . '/hello.txt'));
+		self::assertSame([], glob($destination . '.unwrapped*') ?: []);
 	}
 
 	/**

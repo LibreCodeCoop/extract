@@ -50,7 +50,7 @@ jobs:
       - name: Install archive backends needed by tests
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq p7zip-full
+          sudo apt-get install -y -qq p7zip-full zstd
 
       - name: Run unit tests
         run: composer run test:unit -- --no-progress

@@ -183,6 +183,7 @@ final class ExtractionDestinationTest extends TestCase {
 		$year->expects(self::once())->method('newFolder')->with('Q4 #2026')->willReturn($destination);
 		$folder = $this->createMock(Folder::class);
 		$folder->method('isCreatable')->willReturn(true);
+		$folder->method('getFreeSpace')->willReturn(-2);
 		$folder->method('nodeExists')->willReturn(false);
 		$folder->expects(self::once())->method('newFolder')->with('reports')->willReturn($year);
 		$folder->method('get')->willReturnCallback(
@@ -217,7 +218,7 @@ final class ExtractionDestinationTest extends TestCase {
 		$controller = new ExtractionController(
 			'extract',
 			$this->createStub(IRequest::class),
-			new ExtractionService($l10n, $logger),
+			new ExtractionService($l10n, $logger, $this->createStub(\OCP\IConfig::class)),
 			$root,
 			$l10n,
 			$logger,
@@ -279,7 +280,7 @@ final class ExtractionDestinationTest extends TestCase {
 		return new ExtractionController(
 			'extract',
 			$this->createStub(IRequest::class),
-			new ExtractionService($l10n, $logger),
+			new ExtractionService($l10n, $logger, $this->createStub(\OCP\IConfig::class)),
 			$root,
 			$l10n,
 			$logger,

@@ -3,4 +3,9 @@
 
 # workflow-lock-schema: 3
 
-{"workflow":"npm-audit-fix.yml","sha256":"08d5cec37b75b607ae7bf21b9692a5aa50c503e5fc028c044f88864e20662e01","catalog_commit":"75212d6bed0005c0eb33abe07c28584cc68baf4f"}
+{"workflow":"appstore-build-publish.yml","sha256":"3b28bdc6f1a0ac04438a6d498f1425c48c79795515a35c166186f8ad54169834","catalog_commit":"01ded35f8a5c207868efc5802eeace3e72b54a86"}
+{"workflow":"block-unconventional-commits.yml","sha256":"682899d221aa96cd1ad93c3cf46970205a083e49e45d9405b86f4b732a350cea","catalog_commit":"01ded35f8a5c207868efc5802eeace3e72b54a86"}
+{"workflow":"lint-info-xml.yml","sha256":"3a2ed92f25ae9a233d6d64d44bd122b39dee0f153e7a1a9dc81bfb19adcec09b","catalog_commit":"01ded35f8a5c207868efc5802eeace3e72b54a86"}
+{"workflow":"npm-audit-fix.yml","sha256":"e122e78371daf2cbc302c18eeeec4846066b0e6a4e2636ea12732ba3ef211973","catalog_commit":"01ded35f8a5c207868efc5802eeace3e72b54a86"}
+{"workflow":"prepare-release.yml","sha256":"cf0be036dcb62669e489bcefea915564bebd737c513c6c9aa843bf46f06c4cd8","catalog_commit":"01ded35f8a5c207868efc5802eeace3e72b54a86"}
+{"workflow":"reuse.yml","sha256":"f563735e1a573cca3acb2975321ee760e5d52cb6ca64bfcc11a5da4ae0f9bf73","catalog_commit":"01ded35f8a5c207868efc5802eeace3e72b54a86"}
