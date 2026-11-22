@@ -30,7 +30,7 @@ final class BoundedStreamCopier {
 			return false;
 		}
 		// Preserve ZIP overwrite semantics; RAR entries must never overwrite.
-		$output = fopen($target, $expectedBytes === null ? 'wb' : 'xb');
+		$output = @fopen($target, $expectedBytes === null ? 'wb' : 'xb');
 		if ($output === false) {
 			return false;
 		}

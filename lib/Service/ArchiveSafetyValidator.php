@@ -14,7 +14,10 @@ use Psr\Log\LoggerInterface;
 
 /** Validate entry names and archive metadata independently from decoders. */
 final class ArchiveSafetyValidator {
-	public function __construct(private IL10N $l, private LoggerInterface $logger) {
+	public function __construct(
+		private IL10N $l,
+		private LoggerInterface $logger,
+	) {
 	}
 
 	private function isUnsafePath(string $entry): bool {

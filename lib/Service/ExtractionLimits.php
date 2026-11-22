@@ -13,7 +13,9 @@ use OCP\IConfig;
 
 /** Resolve positive application limits without exposing configuration parsing. */
 final class ExtractionLimits {
-	public function __construct(private IConfig $config) {
+	public function __construct(
+		private IConfig $config,
+	) {
 	}
 
 	public function configuredLimit(string $key, int $default): int {

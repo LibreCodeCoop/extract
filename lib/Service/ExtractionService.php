@@ -1,4 +1,5 @@
 <?php
+
 /**
  * SPDX-FileCopyrightText: 2012-2022 Paul Lereverend <paulereverend@gmail.com>
  * SPDX-FileCopyrightText: 2022 Claus-Justus Heine <himself@claus-justus-heine.de>
