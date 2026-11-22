@@ -175,6 +175,37 @@ final class WrappedTarballExtractionTest extends TestCase {
 	}
 
 	/**
+	 * XZ-compressed tarballs use the established supervised two-pass decoder.
+	 */
+	public function testTarXzIsUnpackedFromFixture(): void {
+		$archive = __DIR__ . '/../Fixtures/valid.tar.xz';
+		$destination = $this->tmpDir . '/xz-result';
+		$method = new \ReflectionMethod(ExtractionController::class, 'extractWrappedTarball');
+		$response = $method->invoke($this->controller, $archive, $destination);
+
+		self::assertSame(['code' => 1], $response);
+		self::assertSame("hello world\n", file_get_contents($destination . '/hello.txt'));
+		self::assertSame([], glob($destination . '.unwrapped*') ?: []);
+	}
+
+	/**
+	 * TAR+Zstandard first uses modern full 7z, then expands the inner tar.
+	 */
+	public function testTarZstdIsUnpackedFromFixture(): void {
+		if (trim((string)shell_exec('command -v zstd 2>/dev/null || command -v 7z 2>/dev/null')) === '') {
+			self::markTestSkipped('Neither zstd nor full 7z is installed');
+		}
+		$archive = __DIR__ . '/../Fixtures/valid.tar.zst';
+		$destination = $this->tmpDir . '/zstd-result';
+		$method = new \ReflectionMethod(ExtractionController::class, 'extractWrappedTarball');
+		$response = $method->invoke($this->controller, $archive, $destination, null, true);
+
+		self::assertSame(['code' => 1], $response);
+		self::assertSame("hello world\n", file_get_contents($destination . '/hello.txt'));
+		self::assertSame([], glob($destination . '.unwrapped*') ?: []);
+	}
+
+	/**
 	 * A plain `.tar` is expanded by a single 7za pass, so it must never be sent
 	 * down the two-pass path.
 	 */

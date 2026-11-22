@@ -75,26 +75,29 @@ child processes on completion or failure. The PHP `rar` extension follows a
 separate bounded streaming path with CRC checks rather than spawning a decoder,
 but it still cannot provide an operating-system-enforced CPU or disk quota.
 
-The `zip` PHP extension is required for Zip files. Rar needs either the PHP
-`rar` extension or the `unrar` binary; every other format is handled by the
-`7za` binary shipped with p7zip.
+The `zip` PHP extension is required for ZIP files. RAR uses the PHP `rar`
+extension, `unrar`, or full `7z`. TAR, XZ, 7z, gzip, bzip2, and DEB use `7za`.
+Zstandard (`.zst` and `.tar.zst`) uses the optional `zstd` executable, or full
+`7z` **24.01 or newer**. Zstandard archives do not reliably expose an expanded
+size in archive listings, so the staging supervisor is the protection for these
+formats; its limits are best-effort, not strict disk quotas.
 
 #### Ubuntu / Debian
 
 ```bash
-sudo apt-get install p7zip p7zip-full unrar
+sudo apt-get install p7zip p7zip-full unrar zstd
 ```
 
 #### Fedora / RHEL / CentOS
 
 ```bash
-sudo dnf install p7zip p7zip-plugins unrar
+sudo dnf install p7zip p7zip-plugins unrar zstd
 ```
 
 #### macOS
 
 ```bash
-brew install p7zip
+brew install p7zip zstd
 ```
 
 ## 📦 Installation
@@ -179,14 +182,19 @@ user data.
 | Tar | `.tar` | `7za` |
 | Tar + Gzip | `.tar.gz`, `.tgz` | `7za` |
 | Tar + Bzip2 | `.tar.bz2`, `.tbz2` | `7za` |
+| Tar + XZ | `.tar.xz`, `.txz` | `7za` (two-pass) |
+| Zstandard | `.zst`, `.zstd` | `zstd` or full `7z` 24.01+ |
+| Tar + Zstandard | `.tar.zst`, `.tar.zstd`, `.tzst` | `zstd` or full `7z` 24.01+, then `7za` |
 | Gzip | `.gz` | `7za` |
 | 7z | `.7z` | `7za` |
 | Deb | `.deb` | `7za` |
 
 On systems without the PHP `rar` extension or `unrar`, the full `7z`
 executable can extract supported RAR archives as an additional fallback.
-The smaller `7za` executable does not necessarily support RAR; on Debian 13,
-install the `7zip` package to obtain the full decoder.
+The smaller `7za` executable does not necessarily support RAR or Zstandard;
+on Debian 13, install the `7zip` package to obtain the full decoder. For
+Zstandard, installing the `zstd` command is sufficient and works even when
+older full 7z versions cannot decode `.zst`.
 
 > **Note:** Archives protected by a password are not supported. Extraction works
 > on a normal Nextcloud data directory, on object storage and with server-side
@@ -196,9 +204,10 @@ install the `7zip` package to obtain the full decoder.
 
 ### External storage
 
-Archives on an external storage are unpacked through a temporary folder in the
-app's own data directory, then moved into place. If a previous run was
-interrupted, that temporary folder is removed before the new extraction starts.
+Archives on external and local storage are unpacked into a request-owned
+temporary directory and imported through the Nextcloud files API. This avoids
+cross-device renames and updates the file cache for the destination. Temporary
+staging content is removed after the request, including on failure.
 
 ## 🛠️ Development
 
@@ -293,17 +302,19 @@ not introduce automatic release publishing.
 
 The archive tool could not unpack the file. Common causes:
 
-- **Tool missing**: for Rar archives install the PHP `rar` extension or the
-  `unrar` binary; for every other format install `p7zip` and `p7zip-full` and
-  check that `7za` is on the `PATH` of the web server user.
+- **Tool missing**: for RAR install the PHP `rar` extension, `unrar`, or full
+  `7z`; for TAR, XZ, 7z, gzip, bzip2 and DEB install `p7zip-full` and check
+  that `7za` is on the web server user's `PATH`. For Zstandard install `zstd`
+  or full `7z` version 24.01 or newer.
 - **Damaged or unreadable archive**: the file is truncated, corrupt, or not
   actually an archive of that format.
 - **Permissions**: the web server user cannot read the archive or write into the
   target folder.
 - **Insufficient space** on the volume holding the archive.
 
-For a failed `7za` or `unrar` run the Nextcloud log records the exit code and the
-tool output. Zip extraction and a missing tool are not logged with that detail.
+For a failed external decoder, the Nextcloud log records the rejection reason
+(for example a timeout, output limit or nonzero exit). To avoid unbounded
+memory consumption, raw decoder output is not retained in extraction logs.
 
 ### "Unsupported archive type"
 
@@ -322,18 +333,17 @@ app like any other folder.
 - **Server-side encryption enabled.** The encryption storage wrapper does the
   same, because it has to decrypt to a temporary file first.
 
-The app detects both through `Storage::isLocal()`. On local storage it keeps
-unpacking the archive next to the original file, which avoids copying the
-payload a second time.
+Both local and non-local archives are staged separately and published through
+Nextcloud's files API. The backend never unpacks into an untracked path next
+to the original file.
 
 If extraction used to report "Extraction is only supported on local storage" on
 these setups, update to a version that includes the import step.
 
 ### A password-protected archive
 
-Password-protected archives are not supported. Zip and the 7-Zip formats report
-"Oops something went wrong."; Rar with the PHP `rar` extension is the exception,
-because that path does not surface a failure.
+Password-protected archives are not supported, including ZIP, 7z, and RAR.
+An encrypted archive must not be reported as successfully extracted.
 
 ### Large archives
 

@@ -15,15 +15,14 @@
     * 7z
     * Deb
     * Bzip2
+    * Xz / tar.xz
+    * Zstandard / tar.zst
 
 *  **Requirements :**
-    * Rar PHP extension  (pecl -v install rar)
-
-    * **OR**
-    * unrar (sudo apt-get install unrar)
-
-    * **AND**
-    * p7zip (sudo apt-get install p7zip p7zip-full)
+    * PHP zip extension for ZIP
+    * p7zip / p7zip-full (7za) for 7z, TAR, XZ, GZIP, BZIP2 and DEB
+    * PHP rar, unrar or full 7z for RAR
+    * zstd or full 7z (24.01+) for Zstandard
 
 *  **Note :** Password-protected archives are not supported yet. Object storage
    and server-side encryption are supported: the archive is unpacked into a

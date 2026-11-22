@@ -161,6 +161,60 @@ final class CliArchiveExtractor {
 		return $this->runExternalDecoder(['7za', '-y', 'x', $file, '-o' . $extractTo], $extractTo, $availableBytes);
 	}
 
+	/**
+	 * Zstandard is a single-file stream, not a multi-entry archive. The format
+	 * does not require an uncompressed length in its header, so a declared-size
+	 * preflight cannot reliably protect its output. Use the staging supervisor
+	 * for both optional decoders and never let a temporary source basename
+	 * decide the user-visible output filename.
+	 */
+	public function extractZstd(string $file, string $extractTo, ?int $availableBytes = null, ?string $archiveName = null): array {
+		$name = $archiveName ?? basename($file);
+		$targetName = preg_replace('/\.(?:zst|zstd)$/i', '', $name);
+		if (!is_string($targetName) || $targetName === '' || $targetName === '.' || $targetName === '..'
+			|| str_contains($targetName, '/') || str_contains($targetName, '\\')
+			|| preg_match('/[\x00-\x1f\x7f]/', $targetName) === 1 || preg_match('//u', $targetName) !== 1) {
+			return ['code' => 0, 'desc' => $this->l->t('Archive contains an invalid filename')];
+		}
+
+		if ($this->isCommandAvailable('zstd')) {
+			if (!is_dir($extractTo) && !mkdir($extractTo, 0700, true)) {
+				return ['code' => 0, 'desc' => $this->l->t('Could not prepare extraction directory')];
+			}
+			return $this->runExternalDecoder(
+				['zstd', '-d', '-q', '-f', '-o', $extractTo . '/' . $targetName, '--', $file],
+				$extractTo,
+				$availableBytes,
+			);
+		}
+
+		if (!$this->isCommandAvailable('7z')) {
+			return ['code' => 0, 'desc' => $this->l->t('Zstandard extraction requires zstd or full 7z version 24.01 or newer')];
+		}
+		$listing = $this->listWithLimits(['7z', 'l', '-slt', $file]);
+		if ($listing === null || !in_array('Type = zstd', array_map('trim', $listing), true)) {
+			return ['code' => 0, 'desc' => $this->l->t('Could not inspect Zstandard archive with full 7z')];
+		}
+		$response = $this->runExternalDecoder(['7z', '-y', 'x', $file, '-o' . $extractTo], $extractTo, $availableBytes);
+		if ($response['code'] === 0) {
+			return $response;
+		}
+
+		// Full 7z names the output after the local archive copy. Rename the
+		// single decoded stream to the original Nextcloud filename when needed.
+		if (!is_dir($extractTo)) {
+			return ['code' => 0, 'desc' => $this->l->t('Could not extract archive')];
+		}
+		$entries = iterator_to_array(new \FilesystemIterator($extractTo, \FilesystemIterator::SKIP_DOTS), false);
+		if (count($entries) !== 1 || !$entries[0]->isFile() || $entries[0]->isLink()) {
+			return ['code' => 0, 'desc' => $this->l->t('Could not extract archive')];
+		}
+		if ($entries[0]->getFilename() !== $targetName && !rename($entries[0]->getPathname(), $extractTo . '/' . $targetName)) {
+			return ['code' => 0, 'desc' => $this->l->t('Could not prepare extracted filename')];
+		}
+		return $response;
+	}
+
 	private function assertSafeRarSevenZip(string $file): ?array {
 		$output = $this->listWithLimits(['7z', 'l', '-ba', '-slt', $file]);
 		if ($output === null) {
