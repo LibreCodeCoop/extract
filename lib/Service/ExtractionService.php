@@ -35,7 +35,126 @@ final class ExtractionService {
 
 
 
+	/** @return null|array{code: 0, desc: string} */
+	private function assertSafeZip(ZipArchive $zip): ?array {
+		for ($i = 0; $i < $zip->numFiles; $i++) {
+			$name = $zip->getNameIndex($i);
+			if ($name === false) {
+				return ['code' => 0, 'desc' => $this->l->t('Failed to read archive index')];
+			}
+			if ($error = $this->safety->rejectUnsafe($name)) {
+				return $error;
+			}
+		}
+		return null;
+	}
 
+	/**
+	 * Run archive listing with a bounded output size and an execution deadline.
+	 *
+	 * @param non-empty-list<string> $command
+	 * @return ?list<string>
+	 */
+	private function listWithLimits(array $command): ?array {
+		$result = ResourceLimitedProcess::capture(
+			$command,
+			self::MAX_ARCHIVE_LISTING_BYTES,
+			self::ARCHIVE_LIST_TIMEOUT_SECONDS,
+		);
+		if (!$result['success']) {
+			$this->logger->warning('Archive listing rejected: ' . $result['reason']);
+			return null;
+		}
+		return explode("\n", $result['output']);
+	}
+
+
+
+	/** @return null|array{code: 0, desc: string} */
+	private function assertSafeRarShell(string $file): ?array {
+		$output = $this->listWithLimits(['unrar', 'lb', $file]);
+		if ($output === null) {
+			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
+		}
+		foreach ($output as $entry) {
+			$entry = rtrim($entry, "\r");
+			if ($entry !== '' && ($error = $this->safety->rejectUnsafe($entry))) {
+				return $error;
+			}
+		}
+		// The plain filename list does not reveal links. Inspect entry types
+		// before extraction, using 7z technical metadata when available.
+		if ($this->isCommandAvailable('7z')) {
+			return $this->assertSafeRarSevenZip($file);
+		}
+		$details = $this->listWithLimits(['unrar', 'lt', $file]);
+		if ($details === null) {
+			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect RAR contents')];
+		}
+		$types = 0;
+		foreach ($details as $line) {
+			if (preg_match('/^\s*Type\s*:\s*(.+)$/i', $line, $match) === 1) {
+				$types++;
+				if (preg_match('/^(?:File|Directory)$/i', trim($match[1])) !== 1) {
+					return ['code' => 0, 'desc' => $this->l->t('Archive contains links or unsupported special files')];
+				}
+			}
+		}
+		if ($types === 0) {
+			return ['code' => 0, 'desc' => $this->l->t('Could not verify RAR entry types')];
+		}
+		return null;
+	}
+
+	/**
+	 * Validate 7za archive paths and reject metadata announcing extraction
+	 * beyond the available quota, staging space, or configured resource caps.
+	 * The external decoder may still misreport sizes; this is a preflight,
+	 * not a substitute for process-level disk isolation.
+	 *
+	 * @return null|array{code: 0, desc: string}
+	 */
+	private function assertSafe7z(string $file, ?int $availableBytes, ?int $temporarySpace): ?array {
+		$output = $this->listWithLimits(['7za', 'l', '-ba', '-slt', $file]);
+		if ($output === null) {
+			return ['code' => 0, 'desc' => $this->l->t('Failed to inspect archive contents')];
+		}
+		$budget = $this->limits->configuredLimit('max_extracted_bytes', self::DEFAULT_MAX_EXTRACTED_BYTES);
+		if ($availableBytes !== null && $availableBytes >= 0) {
+			$budget = min($budget, $availableBytes);
+		}
+		if ($temporarySpace !== null && $temporarySpace >= 0) {
+			$budget = min($budget, $temporarySpace);
+		}
+		$entryLimit = $this->limits->configuredLimit('max_archive_entries', self::DEFAULT_MAX_ARCHIVE_ENTRIES);
+		$entries = 0;
+		$size = 0;
+		foreach ($output as $line) {
+			$line = rtrim($line, "\r");
+			if ($error = $this->safety->rejectUnsafeMetadata($line)) {
+				return $error;
+			}
+			if (str_starts_with($line, 'Path = ')) {
+				if ($error = $this->safety->rejectUnsafe(substr($line, 7))) {
+					return $error;
+				}
+				$entries++;
+				if ($entries > $entryLimit) {
+					return ['code' => 0, 'desc' => $this->l->t('Archive contains too many files')];
+				}
+			} elseif (str_starts_with($line, 'Size = ')) {
+				$declaredSize = filter_var(trim(substr($line, 7)), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+				if ($declaredSize === false) {
+					return ['code' => 0, 'desc' => $this->l->t('Failed to inspect archive contents')];
+				}
+				if ($declaredSize > $budget - $size) {
+					return ['code' => 0, 'desc' => $this->l->t('Archive exceeds the allowed extraction size')];
+				}
+				$size += $declaredSize;
+			}
+		}
+		return null;
+	}
 
 
 
