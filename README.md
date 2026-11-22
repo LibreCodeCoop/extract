@@ -39,11 +39,41 @@ the archive directory.
 | Tool | Purpose | Install |
 |------|---------|---------|
 | PHP `zip` extension | Zip archives | bundled with most PHP builds |
-| PHP `rar` extension **or** `unrar` | Rar archives | `pecl install rar` **or** `apt-get install unrar` |
+| PHP `rar`, `unrar` **or** full `7z` | Rar archives | `pecl install rar` **or** `apt-get install unrar` **or** `apt-get install 7zip` |
 | `p7zip` / `p7zip-full` | Tar, Gzip, Bzip2, 7z, Deb | `apt-get install p7zip p7zip-full` |
 
 Extraction needs enough free space in the server's temporary directory for the
 uncompressed archive. Symbolic links in archives are not supported.
+
+External decoders require PHP `proc_open` to be enabled; if it is disabled,
+extraction fails closed rather than falling back to unsupervised `exec()`.
+ZIP extraction enforces the destination's available Nextcloud quota, staging
+disk free space, and two configurable safety limits (defaults: **2 GiB** total
+uncompressed bytes and **10,000** entries). The limits apply before extraction
+using ZIP metadata and during streaming using the actual bytes written.
+Administrators may adjust them for trusted large archives, for example:
+
+```bash
+occ config:app:set extract max_extracted_bytes --value=4294967296
+occ config:app:set extract max_archive_entries --value=20000
+```
+
+The same configured limits and destination-space estimates are now checked
+against the *declared* contents of archives handled by `7za` (7z, tar,
+Gzip, Bzip2 and Deb) **before** launching their extraction. Unlike the ZIP
+streaming path, an external decoder may expand beyond dishonest archive
+metadata before the app can stop it. Command-line decoders now run under a
+best-effort supervisor that periodically measures the staging directory,
+interrupts processes that exceed the configured size or entry budget, and
+enforces a default **300-second** timeout. Administrators can change it with
+`occ config:app:set extract max_extraction_seconds --value=600`.
+Checks are periodic and can be exceeded briefly; this is **not** a strict
+filesystem quota. High-risk deployments should isolate temporary storage
+with an operating-system-enforced limit. When available, the supervisor
+runs command-line decoders in their own POSIX session and terminates remaining
+child processes on completion or failure. The PHP `rar` extension follows a
+separate bounded streaming path with CRC checks rather than spawning a decoder,
+but it still cannot provide an operating-system-enforced CPU or disk quota.
 
 The `zip` PHP extension is required for Zip files. Rar needs either the PHP
 `rar` extension or the `unrar` binary; every other format is handled by the
@@ -132,18 +162,31 @@ brew install p7zip
 The action is offered for readable archives when you can create files in their
 parent folder. Extraction never modifies the archive itself.
 
+If an archive contains a filename the Nextcloud storage cannot represent
+(including some legacy character encodings), extraction fails explicitly rather
+than discarding those entries and reporting a misleading success. Valid UTF-8
+names are preserved. A newly created target folder is removed if the import
+fails partway through. Legacy clients merging into an existing folder may still
+leave partial changes, since deleting that folder could destroy pre-existing
+user data.
+
 ### Supported formats
 
 | Format | Extensions | Extraction backend |
 |--------|------------|--------------------|
 | Zip | `.zip` | PHP `zip` extension |
-| Rar | `.rar` | PHP `rar` extension or `unrar` |
+| Rar | `.rar` | PHP `rar` extension, `unrar`, or full `7z` fallback |
 | Tar | `.tar` | `7za` |
 | Tar + Gzip | `.tar.gz`, `.tgz` | `7za` |
 | Tar + Bzip2 | `.tar.bz2`, `.tbz2` | `7za` |
 | Gzip | `.gz` | `7za` |
 | 7z | `.7z` | `7za` |
 | Deb | `.deb` | `7za` |
+
+On systems without the PHP `rar` extension or `unrar`, the full `7z`
+executable can extract supported RAR archives as an additional fallback.
+The smaller `7za` executable does not necessarily support RAR; on Debian 13,
+install the `7zip` package to obtain the full decoder.
 
 > **Note:** Archives protected by a password are not supported. Extraction works
 > on a normal Nextcloud data directory, on object storage and with server-side
