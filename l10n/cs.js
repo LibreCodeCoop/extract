@@ -5,8 +5,9 @@ OC.L10N.register(
     "File not found" : "Soubor nenalezen",
     "Zip extension is not available" : "Rozšíření pro zip není k dispozici",
     "Cannot open Zip file" : "Soubor ZIP se nedaří otevřít",
-    "Oops something went wrong. Check that you have rar extension or unrar installed" : "Jejda! Něco se pokazilo. Zkontrolujte, zda máte nainstalovaný rar nebo unrar",
     "Extract" : "Rozbalit",
-    "Extract archive from the web interface" : "Rozbalit archiv z webového rozhraní"
+    "Extract archive from the web interface" : "Rozbalit archiv z webového rozhraní",
+    "Folder name" : "Název složky",
+    "Cancel" : "Zrušit"
 },
 "nplurals=4; plural=(n == 1 && n % 1 == 0) ? 0 : (n >= 2 && n <= 4 && n % 1 == 0) ? 1: (n % 1 != 0 ) ? 2 : 3;");

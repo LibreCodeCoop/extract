@@ -1,4 +1,6 @@
 { "translations": {
-    "File not found" : "Fichero no trobau"
+    "File not found" : "Fichero no trobau",
+    "Folder name" : "Nombre de carpeta",
+    "Cancel" : "Cancel"
 },"pluralForm" :"nplurals=2; plural=(n != 1);"
 }
