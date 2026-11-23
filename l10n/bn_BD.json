@@ -1,4 +1,6 @@
 { "translations": {
-    "File not found" : "ফাইল খুঁজে পাওয়া গেল না"
+    "File not found" : "ফাইল খুঁজে পাওয়া গেল না",
+    "Folder name" : "ফোলডারের নাম",
+    "Cancel" : "Cancel"
 },"pluralForm" :"nplurals=2; plural=(n != 1);"
 }

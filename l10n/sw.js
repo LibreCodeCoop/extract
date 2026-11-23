@@ -5,7 +5,6 @@ OC.L10N.register(
     "File not found" : "Faili halipatikani",
     "Zip extension is not available" : "Kiendelezi cha Zip hakipatikani",
     "Cannot open Zip file" : "Haiwezi kufungua faili la Zip",
-    "Oops something went wrong. Check that you have rar extension or unrar installed" : "Lo, hitilafu fulani imetokea. Angalia kuwa una kiendelezi cha rar au unrar iliyosakinishwa",
     "Extract" : "Chimbua",
     "Extract archive from the web interface" : "Toa kumbukumbu kutoka kwa kiolesura cha wavuti\n ",
     "Folder name" : "Jina la kisanduku",

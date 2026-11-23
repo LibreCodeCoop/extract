@@ -4,7 +4,6 @@ OC.L10N.register(
     "File not found" : "Finner ikke filen",
     "Zip extension is not available" : "Zip-modul er ikke tilgjengelig",
     "Cannot open Zip file" : "Kan ikke åpne zip-fil",
-    "Oops something went wrong. Check that you have rar extension or unrar installed" : "Uff, noe gikk galt. Sjekk at du har rar-utvidelse eller unrar installert",
     "Extract" : "Pakk ut",
     "Extract archive from the web interface" : "Pakk ut arkiv-filen fra web-grensesnittet",
     "Folder name" : "Mappenavn",
