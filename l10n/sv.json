@@ -3,7 +3,6 @@
     "File not found" : "Filen kunde inte hittas",
     "Zip extension is not available" : "ZIP-tillägget är inte tillgängligt",
     "Cannot open Zip file" : "Det går inte att öppna ZIP-filen",
-    "Oops something went wrong. Check that you have rar extension or unrar installed" : "Ojdå, något gick fel. Kontrollera att du har stöd för RAR eller att unrar är installerat.",
     "Extract" : "Extrahera",
     "Extract archive from the web interface" : "Extrahera arkiv från webbgränssnittet",
     "Folder name" : "Mappnamn",

@@ -4,7 +4,6 @@ OC.L10N.register(
     "File not found" : "파일을 찾을 수 없음",
     "Zip extension is not available" : "Zip 확장 기능은 사용할 수 없습니다.",
     "Cannot open Zip file" : "Zip 파일을 열 수 없음",
-    "Oops something went wrong. Check that you have rar extension or unrar installed" : "앗, 무엇인가 잘못되었습니다. rar 확장기능 혹은 unrar을 설치했는지 확인하십시오",
     "Extract" : "압축 풀기",
     "Extract archive from the web interface" : "웹 인터페이스에서 압축 풀기",
     "Folder name" : "폴더 이름",

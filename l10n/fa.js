@@ -5,7 +5,6 @@ OC.L10N.register(
     "File not found" : "فایل پیدا نشد",
     "Zip extension is not available" : "افزونه Zip در دسترس نیست",
     "Cannot open Zip file" : "نمی‌توان فایل Zip را باز کرد",
-    "Oops something went wrong. Check that you have rar extension or unrar installed" : "اوه، مشکلی پیش آمد. مطمئن شوید که افزونه rar یا unrar نصب شده است",
     "Extract" : "استخراج",
     "Extract archive from the web interface" : "استخراج بایگانی از رابط وب",
     "Folder name" : "نام پوشه",
