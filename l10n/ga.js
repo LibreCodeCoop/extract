@@ -5,7 +5,6 @@ OC.L10N.register(
     "File not found" : "Comhad gan aimsiú",
     "Zip extension is not available" : "Níl síneadh zip ar fáil",
     "Cannot open Zip file" : "Ní féidir an comhad Zip a oscailt",
-    "Oops something went wrong. Check that you have rar extension or unrar installed" : "Úps chuaigh rud éigin mícheart. Cinntigh go bhfuil síneadh rar nó unrar suiteáilte agat",
     "Extract" : "Sliocht",
     "Extract archive from the web interface" : "Sliocht cartlann ón gcomhéadan gréasáin",
     "Folder name" : "Ainm fillteáin",

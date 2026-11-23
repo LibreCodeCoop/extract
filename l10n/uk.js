@@ -5,7 +5,6 @@ OC.L10N.register(
     "File not found" : "Файл не знайдено",
     "Zip extension is not available" : "Розширення ZIP недоступне",
     "Cannot open Zip file" : "Не вдається відкрити файл ZIP",
-    "Oops something went wrong. Check that you have rar extension or unrar installed" : "Щось пішло не так. Перевірте, чи встановлено розширення rar або unrar",
     "Extract" : "Видобути",
     "Extract archive from the web interface" : "Видобути архів у вебінтерфейсів",
     "Folder name" : "Назва каталогу",

@@ -1,4 +1,6 @@
 { "translations": {
-    "File not found" : "Netrovita dosiero"
+    "File not found" : "Netrovita dosiero",
+    "Folder name" : "Dosierujnomo",
+    "Cancel" : "Cancel"
 },"pluralForm" :"nplurals=2; plural=(n != 1);"
 }
